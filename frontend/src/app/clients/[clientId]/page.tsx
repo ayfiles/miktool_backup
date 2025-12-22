@@ -2,13 +2,14 @@ import { getOrdersByClient } from "@/lib/api";
 import ClientOrdersClient from "@/components/order/ClientOrdersClient";
 
 interface Props {
-  params: {
+  params: Promise<{
     clientId: string;
-  };
+  }>;
 }
 
 export default async function ClientOrdersPage({ params }: Props) {
-  const { clientId } = params;
+  // WICHTIG: params muss in Next.js 15+ erst awaited werden!
+  const { clientId } = await params;
 
   // ✅ Server darf async
   const orders = await getOrdersByClient(clientId);

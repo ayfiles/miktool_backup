@@ -19,12 +19,12 @@ interface CreateOrderInput {
 }
 
 /* ===============================
-   CREATE ORDER (orders + order_items)
+   CREATE ORDER
 ================================ */
 export async function createOrder(input: CreateOrderInput) {
   const orderId = uuid();
 
-  // 1️⃣ Load client (customer_name is NOT NULL)
+  // 1. Client laden
   const { data: client, error: clientError } = await supabase
     .from("clients")
     .select("name")
@@ -35,27 +35,25 @@ export async function createOrder(input: CreateOrderInput) {
     throw clientError ?? new Error("Client not found");
   }
 
-  // 2️⃣ Create order (WITH STATUS)
+  // 2. Order anlegen
   const { error: orderError } = await supabase.from("orders").insert({
     id: orderId,
     client_id: input.clientId,
     customer_name: client.name,
-    status: "draft", // ✅ NEW
+    status: "draft",
     created_at: new Date().toISOString(),
   });
 
-  if (orderError) {
-    throw orderError;
-  }
+  if (orderError) throw orderError;
 
-  // 3️⃣ Create order items
+  // 3. Items anlegen
   const orderItems = input.items.map((item) => ({
     order_id: orderId,
     product_id: item.productId,
     color: item.color,
     size: item.size,
     quantity: item.quantity,
-    branding_method: item.branding.method,   // 🔧 optional, falls Spalte existiert
+    branding_method: item.branding.method,
     branding_position: item.branding.position,
     created_at: new Date().toISOString(),
   }));
@@ -64,18 +62,15 @@ export async function createOrder(input: CreateOrderInput) {
     .from("order_items")
     .insert(orderItems);
 
-  if (itemsError) {
-    throw itemsError;
-  }
+  if (itemsError) throw itemsError;
 
   return { orderId };
 }
 
 /* ===============================
-   GET ORDER BY ID (PDF + DETAIL)
+   GET ORDER BY ID
 ================================ */
 export async function getOrderById(orderId: string) {
-  // 1️⃣ Order
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select("id, client_id, customer_name, status, created_at")
@@ -83,59 +78,48 @@ export async function getOrderById(orderId: string) {
     .single();
 
   if (orderError || !order) {
-    console.error("❌ getOrderById (order) failed:", orderError);
     throw orderError ?? new Error("Order not found");
   }
 
-  // 2️⃣ Items + Product Name
   const { data: items, error: itemsError } = await supabase
     .from("order_items")
     .select(`
-      id,
-      product_id,
-      color,
-      size,
-      quantity,
-      branding_method,
-      branding_position,
-      products (
-        name
-      )
+      id, product_id, color, size, quantity, branding_method, branding_position,
+      products ( name )
     `)
     .eq("order_id", orderId);
 
-  if (itemsError) {
-    console.error("❌ getOrderById (items) failed:", itemsError);
-    throw itemsError;
-  }
+  if (itemsError) throw itemsError;
 
-  return {
-    ...order,
-    items: items ?? [],
-  };
+  return { ...order, items: items ?? [] };
 }
 
-/* ---------------------------------
-   DELETE ORDER (SAFE)
---------------------------------- */
-export async function deleteOrder(orderId: string) {
-  // 1️⃣ Delete order_items
-  const { error: itemsError } = await supabase
-    .from("order_items")
-    .delete()
-    .eq("order_id", orderId);
+/* ===============================
+   UPDATE ORDER STATUS (NEU!)
+================================ */
+export async function updateOrderStatus(orderId: string, newStatus: string) {
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: newStatus })
+    .eq("id", orderId);
 
-  if (itemsError) {
-    throw itemsError;
+  if (error) {
+    throw error;
   }
+  return { success: true };
+}
 
-  // 2️⃣ Delete order
-  const { error: orderError } = await supabase
+/* ===============================
+   DELETE ORDER
+================================ */
+export async function deleteOrder(orderId: string) {
+  // Items werden via CASCADE gelöscht, aber sicherheitshalber:
+  await supabase.from("order_items").delete().eq("order_id", orderId);
+  
+  const { error } = await supabase
     .from("orders")
     .delete()
     .eq("id", orderId);
 
-  if (orderError) {
-    throw orderError;
-  }
+  if (error) throw error;
 }

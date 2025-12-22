@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import DeleteOrderButton from "@/components/order/DeleteOrderButton";
+import { updateOrderStatus } from "@/lib/api"; // ✅ NEU: Import der API-Funktion
 
 function getStatusLabel(status: string) {
   switch (status) {
@@ -49,32 +50,44 @@ export default function ClientOrdersClient({
             </div>
 
             {/* STATUS */}
-            <select
-              value={order.status}
-              onChange={async (e) => {
-                await fetch(
-                  `http://localhost:3001/orders/${order.id}/status`,
-                  {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status: e.target.value }),
+            <div style={{ marginTop: 8, marginBottom: 8 }}>
+              <label style={{ marginRight: 8, fontSize: 12 }}>Status:</label>
+              <select
+                value={order.status}
+                onChange={async (e) => {
+                  try {
+                    // ✅ Hier wird jetzt die API-Funktion genutzt
+                    await updateOrderStatus(order.id, e.target.value);
+                    
+                    // Seite neu laden, um den neuen Status zu bestätigen
+                    location.reload(); 
+                  } catch (err) {
+                    console.error(err);
+                    alert("Fehler beim Ändern des Status.");
                   }
-                );
-                location.reload();
-              }}
-            >
-              <option value="draft">Draft</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="production">Production</option>
-              <option value="done">Done</option>
-            </select>
+                }}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 4,
+                  border: "1px solid #444",
+                  background: "#222",
+                  color: "#fff"
+                }}
+              >
+                <option value="draft">Draft</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="production">Production</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
 
             <div style={{ marginTop: 12, display: "flex", gap: 12 }}>
               <a
                 href={`http://localhost:3001/orders/${order.id}/pdf`}
                 target="_blank"
+                style={{ textDecoration: "underline", color: "#fff" }}
               >
-                PDF
+                📄 Download PDF
               </a>
 
               <DeleteOrderButton orderId={order.id} />

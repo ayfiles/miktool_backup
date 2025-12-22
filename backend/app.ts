@@ -11,7 +11,8 @@ export function createApp(): Express {
   app.use(
     cors({
       origin: "http://localhost:3000",
-      methods: ["GET", "POST", "DELETE", "PUT", "OPTIONS"],
+      // ✅ FIX: "PATCH" muss hier explizit dabei sein!
+      methods: ["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"],
       allowedHeaders: ["Content-Type"],
     })
   );

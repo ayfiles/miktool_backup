@@ -4,8 +4,8 @@ import {
   createOrder,
   getOrderById,
   deleteOrder,
+  updateOrderStatus, // ✅ Importiert
 } from "../services/orderService";
-import { supabase } from "../supabaseClient";
 
 const router = Router();
 
@@ -42,17 +42,16 @@ router.patch("/:orderId/status", async (req, res) => {
     return res.status(400).json({ error: "Invalid status" });
   }
 
-  const { error } = await supabase
-    .from("orders")
-    .update({ status })
-    .eq("id", orderId);
-
-  if (error) {
+  try {
+    // ✅ Nutzt jetzt den Service
+    await updateOrderStatus(orderId, status);
+    
+    // ✅ WICHTIG: Sendet JSON zurück, damit api.ts res.json() nicht crasht
+    res.status(200).json({ success: true }); 
+  } catch (error: any) {
     console.error("❌ Failed to update order status:", error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
-
-  res.status(204).send();
 });
 
 /* =============================
@@ -131,7 +130,9 @@ router.delete("/:orderId", async (req, res) => {
 
   try {
     await deleteOrder(orderId);
-    res.status(204).send();
+    // Hier ist kein JSON-Return nötig, da deleteOrder im Frontend meist void ist,
+    // aber JSON schadet nie:
+    res.status(200).json({ success: true });
   } catch (error: any) {
     console.error("❌ Failed to delete order:", error);
     res.status(400).json({
