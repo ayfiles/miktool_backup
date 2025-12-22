@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import BackButton from "@/components/ui/BackButton"; // ✅ Importieren
+import BackButton from "@/components/ui/BackButton";
+import LogoutButton from "@/components/ui/LogoutButton"; // ✅ NEU: Import
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,8 +29,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* ✅ Hier wird der Button eingefügt */}
+        {/* Navigation Buttons */}
         <BackButton />
+        <LogoutButton /> {/* ✅ NEU: Button eingefügt */}
         
         {children}
       </body>
