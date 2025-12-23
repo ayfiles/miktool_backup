@@ -8,10 +8,14 @@ const API_BASE_URL = "http://localhost:3001";
    HELPER: FETCH WITH AUTH
    Holt den Token automatisch (Client & Server)
 ========================================= */
+/* =========================================
+   HELPER: FETCH WITH AUTH
+   Holt den Token automatisch (Client & Server)
+========================================= */
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   let token = "";
 
-  // A) Sind wir im Browser? (Client Component)
+  // A) Client Component
   if (typeof window !== "undefined") {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,52 +24,53 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     const { data } = await supabase.auth.getSession();
     token = data.session?.access_token || "";
   } 
-  // B) Sind wir auf dem Server? (Server Component)
+  // B) Server Component
   else {
-    // Dynamischer Import, damit der Build im Browser nicht crasht
     const { cookies } = await import("next/headers");
     const { createServerClient } = await import("@supabase/ssr");
-    
     const cookieStore = await cookies();
-    
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() { return cookieStore.getAll() },
-          setAll() {} // Brauchen wir hier nicht
+          setAll() {} 
         }
       }
     );
-    
     const { data } = await supabase.auth.getSession();
     token = data.session?.access_token || "";
   }
 
-  // Request absenden mit Token
   const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
       ...options.headers,
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`, // ✅ Hier ist der Ausweis
+      "Authorization": `Bearer ${token}`,
     },
   });
 
-  // Fehlerbehandlung zentral
+  // ✅ FIX: Bessere Fehlerbehandlung
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    console.error(`API Error [${endpoint}]:`, errorData);
+    let errorMessage = `Request failed: ${res.status}`;
+    try {
+      // Versuch JSON zu parsen
+      const errorData = await res.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      // Falls kein JSON, versuche Text (z.B. bei 404 HTML)
+      const text = await res.text();
+      if (text) errorMessage = text;
+    }
     
-    // Wenn 401/403 -> Logout erzwingen oder Fehler werfen
-    throw new Error(errorData.error || `Request failed: ${res.status}`);
+    console.error(`API Error [${endpoint}]:`, errorMessage);
+    throw new Error(errorMessage);
   }
 
-  // Bei DELETE oder leerem Body kein JSON parsen
   if (res.status === 204) return;
   
-  // Versuchen JSON zu parsen, sonst Text zurückgeben (oder ignorieren)
   const text = await res.text();
   return text ? JSON.parse(text) : {};
 }
@@ -129,4 +134,29 @@ export async function updateOrderStatus(orderId: string, status: string) {
 /* --- DASHBOARD --- */
 export async function getDashboardStats() {
   return fetchWithAuth("/dashboard/stats", { cache: "no-store" });
+}
+
+/* --- PDF DOWNLOAD --- */
+export async function downloadOrderPdf(orderId: string) {
+  // 1. Token holen (nur Client-seitig nötig für diesen Button)
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token || "";
+
+  // 2. Request mit Auth-Header
+  const res = await fetch(`${API_BASE_URL}/orders/${orderId}/pdf`, {
+    headers: {
+      "Authorization": `Bearer ${token}`, // 🔑 Hier ist der Ausweis
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to download PDF");
+  }
+
+  // 3. WICHTIG: Wir geben einen Blob (Datei) zurück, kein JSON
+  return res.blob();
 }

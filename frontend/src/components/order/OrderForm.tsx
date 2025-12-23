@@ -1,8 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createOrder } from "@/lib/api"; // ✅ FIX: Importiert jetzt die sichere Funktion
 import { Product } from "@/types/product";
-import styles from "./OrderForm.module.css";
+import { Plus, Trash2, Save } from "lucide-react";
+import { toast } from "sonner"; // ✅ NEU: Toasts statt Text-Fehler
+
+// Shadcn UI
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
 type BrandingMethod = "print" | "embroidery";
 type BrandingPosition = "front" | "back";
@@ -24,9 +35,9 @@ interface Props {
 }
 
 export default function OrderForm({ products, clientId }: Props) {
-  /* -----------------------------
-     Temporary item selection
-  ----------------------------- */
+  const router = useRouter();
+  
+  /* --- Temporary item selection --- */
   const [productId, setProductId] = useState("");
   const [color, setColor] = useState("");
   const [size, setSize] = useState("");
@@ -34,13 +45,10 @@ export default function OrderForm({ products, clientId }: Props) {
   const [method, setMethod] = useState<BrandingMethod>("print");
   const [position, setPosition] = useState<BrandingPosition>("front");
 
-  /* -----------------------------
-     Order state
-  ----------------------------- */
+  /* --- Order state --- */
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [orderId, setOrderId] = useState<string | null>(null);
+  // error state entfernt -> wir nutzen jetzt Toasts!
 
   const selectedProduct = products.find((p) => p.id === productId);
 
@@ -48,338 +56,219 @@ export default function OrderForm({ products, clientId }: Props) {
     return products.find((p) => p.id === id);
   }
 
-  /* -----------------------------
-     Add + Merge Items
-  ----------------------------- */
+  /* --- Logic --- */
   function addItem() {
     if (!productId || !color || !size || quantity < 1) {
-      setError("Please select product, color, size and quantity.");
+      toast.error("Please select product, color, size and quantity."); // ✅ Toast Error
       return;
     }
 
-    setItems((prev) => {
-      const index = prev.findIndex(
-        (i) =>
-          i.productId === productId &&
-          i.color === color &&
-          i.size === size &&
-          i.branding.method === method &&
-          i.branding.position === position
-      );
+    setItems((prev) => [
+      ...prev,
+      {
+        productId,
+        color,
+        size,
+        quantity,
+        branding: { method, position },
+      },
+    ]);
 
-      if (index !== -1) {
-        return prev.map((i, idx) =>
-          idx === index
-            ? { ...i, quantity: i.quantity + quantity }
-            : i
-        );
-      }
-
-      return [
-        ...prev,
-        {
-          productId,
-          color,
-          size,
-          quantity,
-          branding: { method, position },
-        },
-      ];
-    });
-
-    setProductId("");
+    // Reset fields (keeping product for faster entry)
     setColor("");
     setSize("");
     setQuantity(1);
-    setMethod("print");
-    setPosition("front");
-    setError(null);
-  }
-
-  function updateItem(index: number, updates: Partial<OrderItem>) {
-    setItems((prev) =>
-      prev.map((item, i) =>
-        i === index ? { ...item, ...updates } : item
-      )
-    );
+    toast.success("Item added to list"); // Optional: Kleines Feedback
   }
 
   function removeItem(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index));
+    toast.info("Item removed");
   }
 
-  function increaseQty(index: number) {
-    updateItem(index, {
-      quantity: items[index].quantity + 1,
-    });
-  }
-
-  function decreaseQty(index: number) {
-    if (items[index].quantity === 1) return;
-    updateItem(index, {
-      quantity: items[index].quantity - 1,
-    });
-  }
-
-  /* -----------------------------
-     Submit Order (CLIENT AWARE)
-  ----------------------------- */
+  /* --- SUBMIT --- */
   async function submitOrder() {
     if (!clientId) {
-      setError("No client selected.");
+      toast.error("No client selected.");
       return;
     }
 
     if (items.length === 0) {
-      setError("Add at least one item.");
+      toast.error("Add at least one item.");
       return;
     }
 
     setLoading(true);
-    setError(null);
-
-    const payload = {
-      clientId,
-      items: items.map((i) => ({
-        productId: i.productId,
-        color: i.color,
-        size: i.size,
-        quantity: i.quantity,
-        branding: i.branding,
-      })),
-    };
 
     try {
-      const res = await fetch("http://localhost:3001/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      // ✅ FIX: Wir nutzen jetzt createOrder() statt fetch()
+      await createOrder({
+        clientId,
+        items: items.map((i) => ({
+          productId: i.productId,
+          color: i.color,
+          size: i.size,
+          quantity: i.quantity,
+          branding: i.branding,
+        })),
       });
 
-      if (!res.ok) throw new Error();
+      // ✅ Success Feedback
+      toast.success("Order created successfully! 🎉");
 
-      const data = await res.json();
-      setOrderId(data.orderId);
-      setItems([]);
-    } catch {
-      setError("Failed to create order");
+      // Nach Erfolg zurück zur Client-Seite
+      router.refresh();
+      router.push(`/clients/${clientId}`);
+      
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create order. Please try again."); // ✅ Error Feedback
     } finally {
       setLoading(false);
     }
   }
 
-  function downloadPdf() {
-    if (!orderId) return;
-    window.open(
-      `http://localhost:3001/orders/${orderId}/pdf`,
-      "_blank"
-    );
-  }
-
-  /* -----------------------------
-     Render
-  ----------------------------- */
   return (
-    <section className={styles.wrapper}>
-      <h2 className={styles.title}>Order Tool</h2>
-
-      {/* ADD PRODUCT */}
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Add Product</h3>
-
-        <select
-          className={styles.select}
-          value={productId}
-          onChange={(e) => setProductId(e.target.value)}
-        >
-          <option value="">Select product</option>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-
-        {selectedProduct && (
-          <>
-            <select
-              className={styles.select}
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-            >
-              <option value="">Color</option>
-              {selectedProduct.available_colors.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className={styles.select}
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
-            >
-              <option value="">Size</option>
-              {selectedProduct.available_sizes.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-
-            <input
-              className={styles.input}
-              type="number"
-              min={1}
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-            />
-
-            <select
-              className={styles.select}
-              value={method}
-              onChange={(e) =>
-                setMethod(e.target.value as BrandingMethod)
-              }
-            >
-              <option value="print">Print</option>
-              <option value="embroidery">Embroidery</option>
-            </select>
-
-            <select
-              className={styles.select}
-              value={position}
-              onChange={(e) =>
-                setPosition(e.target.value as BrandingPosition)
-              }
-            >
-              <option value="front">Front</option>
-              <option value="back">Back</option>
-            </select>
-
-            <button
-              className={styles.secondaryButton}
-              onClick={addItem}
-            >
-              Add Item
-            </button>
-          </>
-        )}
+    <div className="max-w-2xl mx-auto space-y-8 pb-20">
+      
+      {/* HEADER */}
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">New Order</h2>
+        <p className="text-muted-foreground">Add items to create a production sheet.</p>
       </div>
 
-      {/* ITEMS */}
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Items</h3>
+      {/* 1. ADD PRODUCT CARD */}
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardHeader>
+          <CardTitle className="text-lg">Add Item</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          
+          {/* Product Select */}
+          <div className="space-y-2">
+            <Label>Product</Label>
+            <Select value={productId} onValueChange={setProductId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select product..." />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className={styles.itemsList}>
-          {items.map((item, i) => {
-            const product = getProduct(item.productId);
-
-            return (
-              <div key={i} className={styles.itemRow}>
-                <div className={styles.itemInfo}>
-                  <strong>{product?.name ?? item.productId}</strong>
-
-                  <select
-                    className={styles.select}
-                    value={item.color}
-                    onChange={(e) =>
-                      updateItem(i, { color: e.target.value })
-                    }
-                  >
-                    {product?.available_colors.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
+          {selectedProduct && (
+            <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+              
+              {/* Color */}
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <Select value={color} onValueChange={setColor}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedProduct.available_colors.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
-                  </select>
-
-                  <select
-                    className={styles.select}
-                    value={item.size}
-                    onChange={(e) =>
-                      updateItem(i, { size: e.target.value })
-                    }
-                  >
-                    {product?.available_sizes.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    className={styles.select}
-                    value={item.branding.method}
-                    onChange={(e) =>
-                      updateItem(i, {
-                        branding: {
-                          ...item.branding,
-                          method: e.target.value as BrandingMethod,
-                        },
-                      })
-                    }
-                  >
-                    <option value="print">Print</option>
-                    <option value="embroidery">Embroidery</option>
-                  </select>
-
-                  <select
-                    className={styles.select}
-                    value={item.branding.position}
-                    onChange={(e) =>
-                      updateItem(i, {
-                        branding: {
-                          ...item.branding,
-                          position: e.target.value as BrandingPosition,
-                        },
-                      })
-                    }
-                  >
-                    <option value="front">Front</option>
-                    <option value="back">Back</option>
-                  </select>
-                </div>
-
-                <div className={styles.itemActions}>
-                  <button onClick={() => decreaseQty(i)}>−</button>
-                  <strong>{item.quantity}</strong>
-                  <button onClick={() => increaseQty(i)}>+</button>
-                  <button onClick={() => removeItem(i)}>Remove</button>
-                </div>
+                  </SelectContent>
+                </Select>
               </div>
-            );
-          })}
+
+              {/* Size */}
+              <div className="space-y-2">
+                <Label>Size</Label>
+                <Select value={size} onValueChange={setSize}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedProduct.available_sizes.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Quantity */}
+              <div className="space-y-2">
+                <Label>Quantity</Label>
+                <Input 
+                  type="number" 
+                  min={1} 
+                  value={quantity} 
+                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  className="bg-zinc-950 border-zinc-700"
+                />
+              </div>
+
+              {/* Branding */}
+              <div className="space-y-2">
+                <Label>Method</Label>
+                <Select value={method} onValueChange={(v: any) => setMethod(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="print">Print</SelectItem>
+                    <SelectItem value="embroidery">Embroidery</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+        </CardContent>
+        <CardFooter>
+          <Button onClick={addItem} className="w-full" disabled={!selectedProduct}>
+            <Plus className="mr-2 h-4 w-4" /> Add to List
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* 2. ITEM LIST */}
+      {items.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Order Items ({items.length})</h3>
+          </div>
+          
+          <div className="space-y-2">
+            {items.map((item, i) => {
+               const p = getProduct(item.productId);
+               return (
+                 <div key={i} className="flex items-center justify-between p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                   <div>
+                     <div className="font-medium text-white">{p?.name}</div>
+                     <div className="text-sm text-zinc-400">
+                       {item.color} • {item.size} • {item.branding.method}
+                     </div>
+                   </div>
+                   <div className="flex items-center gap-4">
+                     <div className="font-mono text-lg font-bold">x{item.quantity}</div>
+                     <Button variant="ghost" size="icon" onClick={() => removeItem(i)} className="text-red-400 hover:text-red-300 hover:bg-red-400/10">
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                   </div>
+                 </div>
+               )
+            })}
+          </div>
+
+          <Separator className="my-6 bg-zinc-800" />
+
+          {/* 3. SUBMIT BUTTON */}
+          <Button size="lg" className="w-full text-md" onClick={submitOrder} disabled={loading}>
+            {loading ? (
+              "Saving..." 
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" /> Create Order
+              </>
+            )}
+          </Button>
         </div>
-      </div>
-
-      {/* ACTIONS */}
-      <div className={styles.actions}>
-        <button
-          className={styles.primaryButton}
-          onClick={submitOrder}
-          disabled={loading}
-        >
-          {loading ? "Creating…" : "Create Order"}
-        </button>
-
-        {error && <p className={styles.error}>{error}</p>}
-
-        {orderId && (
-          <>
-            <p className={styles.success}>
-              Order created successfully (ID: {orderId})
-            </p>
-            <button
-              className={styles.secondaryButton}
-              onClick={downloadPdf}
-            >
-              Download Production Sheet (PDF)
-            </button>
-          </>
-        )}
-      </div>
-    </section>
+      )}
+    </div>
   );
 }

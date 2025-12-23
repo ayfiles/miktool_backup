@@ -1,14 +1,17 @@
+
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { updateOrderStatus } from "@/lib/api";
+import { updateOrderStatus, downloadOrderPdf } from "@/lib/api";
 import DeleteOrderButton from "@/components/order/DeleteOrderButton";
-import { FileText, Plus, Calendar } from "lucide-react";
+import { FileText, Plus, Calendar, Loader2 } from "lucide-react";
+import { toast } from "sonner"; // ✅ Toasts nutzen
 
 // ✅ Shadcn UI Components
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
@@ -20,14 +23,44 @@ export default function ClientOrdersClient({
   initialOrders: any[];
 }) {
   const router = useRouter();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
+  // Status ändern (mit schickem "Loading..." -> "Success" Toast)
   const handleStatusChange = async (orderId: string, newStatus: string) => {
+    toast.promise(
+      updateOrderStatus(orderId, newStatus).then(() => router.refresh()),
+      {
+        loading: 'Updating status...',
+        success: 'Status updated successfully! 🚀',
+        error: 'Failed to update status',
+      }
+    );
+  };
+
+  // PDF Download (mit Info -> Success/Error Toast)
+  const handleDownload = async (orderId: string) => {
     try {
-      await updateOrderStatus(orderId, newStatus);
-      router.refresh(); // ✅ Lädt Daten neu ohne harte Seite-Reload
+      setDownloadingId(orderId);
+      toast.info("Preparing PDF download..."); // Start Info
+
+      const blob = await downloadOrderPdf(orderId);
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `production-sheet-${orderId.slice(0, 8)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+
+      toast.success("PDF downloaded successfully!"); // Erfolg
     } catch (err) {
       console.error(err);
-      alert("Fehler beim Ändern des Status.");
+      toast.error("Download failed. Please try again."); // Fehler
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -99,16 +132,22 @@ export default function ClientOrdersClient({
 
                   {/* BUTTONS */}
                   <div className="flex items-center gap-2">
+                    
                     {/* PDF Button */}
-                    <a
-                      href={`http://localhost:3001/orders/${order.id}/pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 border-zinc-700 hover:bg-zinc-800"
+                      onClick={() => handleDownload(order.id)}
+                      disabled={downloadingId === order.id}
                     >
-                      <Button variant="outline" size="sm" className="h-8 border-zinc-700 hover:bg-zinc-800">
-                        <FileText className="mr-2 h-3 w-3" /> PDF
-                      </Button>
-                    </a>
+                      {downloadingId === order.id ? (
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      ) : (
+                        <FileText className="mr-2 h-3 w-3" />
+                      )}
+                      PDF
+                    </Button>
 
                     {/* Delete Button (Wrapper) */}
                     <div className="scale-90 origin-right">
