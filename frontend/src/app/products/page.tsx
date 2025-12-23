@@ -1,7 +1,8 @@
 import { getProducts } from "@/lib/api";
-import { Plus, Package, Search, Filter } from "lucide-react";
+import { Package, Search, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CreateProductDialog } from "@/components/products/CreateProductDialog"; // <--- IMPORTED
 import {
   Table,
   TableBody,
@@ -32,10 +33,8 @@ export default async function ProductsPage() {
             <h1 className="text-2xl font-bold tracking-tight">Product Catalog</h1>
             <p className="text-muted-foreground">Manage your product definitions and base prices.</p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Product
-        </Button>
+        {/* REPLACED BUTTON WITH DIALOG */}
+        <CreateProductDialog />
       </div>
 
       {/* FILTER & SUCHE LEISTE (UI only für jetzt) */}
@@ -71,8 +70,10 @@ export default async function ProductsPage() {
                     <p className="max-w-xs mb-4">
                         Your catalog is empty. Start by adding your first product to the database.
                     </p>
-                    {/* Dieser Button würde dann das "Create Modal" öffnen */}
-                    <Button variant="secondary">Create first product</Button>
+                    {/* Updated empty state button as well */}
+                     <div className="mt-4">
+                        <CreateProductDialog />
+                     </div>
                 </div>
             ) : (
                 <Table>
@@ -130,11 +131,9 @@ export default async function ProductsPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    {/* Platzhalter für Stock, falls du das noch nicht im Type hast */}
                                     <span className="text-muted-foreground">-</span>
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
-                                    {/* Preis Formatierung - falls Preis im Type fehlt, zeigen wir "-" */}
                                     {(product as any).price ? 
                                         new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format((product as any).price) 
                                         : "-"}

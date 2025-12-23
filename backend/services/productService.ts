@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { v4 as uuidv4 } from "uuid";
 
 export async function getAllProducts() {
   const { data, error } = await supabase
@@ -33,6 +34,36 @@ export async function getProductById(id: string) {
       hint: error.hint,
       code: error.code,
     });
+    throw error;
+  }
+
+  return data;
+}
+
+export async function createProduct(productData: {
+  name: string;
+  category?: string;
+  description?: string;
+  available_colors?: string[];
+  available_sizes?: string[];
+}) {
+  const newProduct = {
+    id: uuidv4(),
+    name: productData.name,
+    category: productData.category,
+    description: productData.description,
+    available_colors: productData.available_colors || [],
+    available_sizes: productData.available_sizes || [],
+  };
+
+  const { data, error } = await supabase
+    .from("products")
+    .insert([newProduct])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("❌ SUPABASE ERROR (create product):", error);
     throw error;
   }
 

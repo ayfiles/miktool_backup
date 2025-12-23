@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getAllProducts, getProductById } from "../services/productService";
+import { getAllProducts, getProductById, createProduct } from "../services/productService"; // Import createProduct
 
 const router = Router();
 
@@ -41,6 +41,31 @@ router.get("/:id", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Failed to fetch product:", error);
     res.status(500).json({ error: "Failed to fetch product" });
+  }
+});
+
+// POST /products
+router.post("/", async (req: Request, res: Response) => {
+  try {
+    const { name, category, description, available_colors, available_sizes } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: "Product name is required" });
+    }
+
+    const newProduct = await createProduct({
+      name,
+      category,
+      description,
+      available_colors,
+      available_sizes,
+    });
+
+    res.status(201).json(newProduct);
+  } catch (error) {
+    const e = error as any;
+    console.error("Failed to create product:", e);
+    res.status(500).json({ error: e.message || "Failed to create product" });
   }
 });
 
