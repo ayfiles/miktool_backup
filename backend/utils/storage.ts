@@ -1,6 +1,6 @@
 import { mkdir, writeFile, access } from 'fs/promises';
 import { join } from 'path';
-import { Order } from '../../docs/order-types';
+import { Order } from "../types/order";
 
 const STORAGE_DIR = join(__dirname, '../storage/orders');
 

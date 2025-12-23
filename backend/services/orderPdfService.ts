@@ -25,9 +25,13 @@ export async function generateOrderPdf(orderId: string): Promise<Uint8Array> {
 
   page.drawText(`Order ID: ${order.id}`, { x: 50, y, size: 12, font });
   y -= 20;
-  page.drawText(`Customer: ${order.customerName}`, { x: 50, y, size: 12, font });
+  
+  // ✅ FIX 1: Unterstrich statt camelCase
+  page.drawText(`Customer: ${order.customer_name}`, { x: 50, y, size: 12, font });
   y -= 20;
-  page.drawText(`Created: ${order.createdAt.toLocaleString()}`, {
+  
+  // ✅ FIX 2: Unterstrich & als Datum formatieren
+  page.drawText(`Created: ${new Date(order.created_at).toLocaleDateString()}`, {
     x: 50,
     y,
     size: 12,
@@ -39,8 +43,11 @@ export async function generateOrderPdf(orderId: string): Promise<Uint8Array> {
   y -= 20;
 
   order.items.forEach((item: any, index: number) => {
+    // ✅ FIX 3: Produkt-Name anzeigen (falls vorhanden), sonst ID mit Unterstrich
+    const productName = item.products?.name || item.product_id;
+
     page.drawText(
-      `${index + 1}. ${item.productId} | ${item.color} | ${item.size} | Qty: ${item.quantity}`,
+      `${index + 1}. ${productName} | ${item.color} | ${item.size} | Qty: ${item.quantity}`,
       { x: 60, y, size: 12, font }
     );
     y -= 20;
