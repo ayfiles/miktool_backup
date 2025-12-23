@@ -3,7 +3,11 @@ import { Client } from "@/types/client";
 import { createBrowserClient } from "@supabase/ssr";
 
 // ✅ WICHTIG: 127.0.0.1 nutzen statt localhost für Node/Next.js Fetching
-const API_BASE_URL = "http://127.0.0.1:3001";
+// frontend/src/lib/api.ts
+
+// ✅ Neu: Nimmt die Online-URL (falls vorhanden) oder bleibt lokal
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3001"; 
+
 
 /* =========================================
    HELPER: FETCH WITH AUTH
