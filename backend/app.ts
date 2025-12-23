@@ -1,41 +1,36 @@
-import express, { Express, Request, Response } from "express";
+import express from "express";
 import cors from "cors";
+import dotenv from "dotenv";
 
-import ordersRouter from "./routes/orders";
-import productsRouter from "./routes/products";
+// Route Imports
+import productRoutes from "./routes/products";
 import clientRoutes from "./routes/clients";
-import dashboardRouter from "./routes/dashboard";
+import orderRoutes from "./routes/orders";
+import dashboardRoutes from "./routes/dashboard";
+import inventoryRoutes from "./routes/inventory"; 
 
-// ✅ NEU: Middleware importieren
-import { requireAuth } from "./middleware/auth";
+dotenv.config();
 
-export function createApp(): Express {
-  const app = express();
+const app = express(); // <--- Hier wird die App erstellt (Express, nicht Vue!)
+const PORT = process.env.PORT || 3001;
 
-  app.use(
-    cors({
-      origin: "http://localhost:3000",
-      methods: ["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"],
-      // ✅ WICHTIG: "Authorization" muss hier erlaubt sein, sonst blockt CORS den Token!
-      allowedHeaders: ["Content-Type", "Authorization"],
-    })
-  );
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-  app.use(express.json());
+// Routes registrieren
+app.use("/products", productRoutes);
+app.use("/clients", clientRoutes);
+app.use("/orders", orderRoutes);
+app.use("/dashboard", dashboardRoutes);
+app.use("/inventory", inventoryRoutes);
 
-  // --- ÖFFENTLICHE ROUTEN ---
-  
-  app.get("/health", (_req: Request, res: Response) => {
-    res.json({ status: "ok" });
-  });
+// Health Check
+app.get("/", (req, res) => {
+  res.send("Miktool Backend API is running 🚀");
+});
 
-  // --- GESCHÜTZTE ROUTEN (AB HIER TÜRSTEHER AKTIV) ---
-  app.use(requireAuth); 
-
-  app.use("/orders", ordersRouter);
-  app.use("/products", productsRouter);
-  app.use("/clients", clientRoutes);
-  app.use("/dashboard", dashboardRouter);
-
-  return app;
-}
+// Start Server
+app.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+});

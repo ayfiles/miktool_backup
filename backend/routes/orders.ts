@@ -2,6 +2,7 @@ import { Router } from "express";
 // import PDFDocument from "pdfkit"; // ❌ Nicht mehr benötigt
 import {
   createOrder,
+  getAllOrders, // ✅ NEU: Import hinzugefügt
   getOrderById,
   deleteOrder,
   updateOrderStatus,
@@ -9,6 +10,19 @@ import {
 import { generateHtmlPdf } from "../services/htmlPdfService"; // ✅ NEU: Import
 
 const router = Router();
+
+/* =============================
+   GET ALL ORDERS (NEU für die Liste)
+============================= */
+router.get("/", async (req, res) => {
+  try {
+    const orders = await getAllOrders();
+    res.json(orders);
+  } catch (error: any) {
+    console.error("Failed to fetch orders:", error);
+    res.status(500).json({ error: "Failed to fetch orders" });
+  }
+});
 
 /* =============================
    CREATE ORDER

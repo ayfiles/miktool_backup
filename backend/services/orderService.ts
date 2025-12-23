@@ -68,6 +68,29 @@ export async function createOrder(input: CreateOrderInput) {
 }
 
 /* ===============================
+   GET ALL ORDERS (NEU! Für die Liste)
+================================ */
+export async function getAllOrders() {
+  const { data, error } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      client:clients ( id, name ),
+      items:order_items ( quantity )
+    `)
+    .order("created_at", { ascending: false }); // Neueste zuerst
+
+  if (error) throw error;
+
+  // Daten flachklopfen für einfachere Nutzung im Frontend
+  return data.map((order) => ({
+    ...order,
+    clientName: order.client?.name || order.customer_name || "Unknown Client",
+    itemsCount: order.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0,
+  }));
+}
+
+/* ===============================
    GET ORDER BY ID
 ================================ */
 export async function getOrderById(orderId: string) {
@@ -95,7 +118,7 @@ export async function getOrderById(orderId: string) {
 }
 
 /* ===============================
-   UPDATE ORDER STATUS (NEU!)
+   UPDATE ORDER STATUS
 ================================ */
 export async function updateOrderStatus(orderId: string, newStatus: string) {
   const { error } = await supabase

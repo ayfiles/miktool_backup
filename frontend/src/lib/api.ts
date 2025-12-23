@@ -2,7 +2,8 @@ import { Product } from "@/types/product";
 import { Client } from "@/types/client";
 import { createBrowserClient } from "@supabase/ssr";
 
-const API_BASE_URL = "http://localhost:3001";
+// ✅ WICHTIG: 127.0.0.1 nutzen statt localhost für Node/Next.js Fetching
+const API_BASE_URL = "http://127.0.0.1:3001";
 
 /* =========================================
    HELPER: FETCH WITH AUTH
@@ -78,7 +79,6 @@ export async function getProducts(): Promise<Product[]> {
   return fetchWithAuth("/products", { cache: "no-store" });
 }
 
-// ✅ NEU: Produkt erstellen
 export async function createProduct(payload: Omit<Product, "id">): Promise<Product> {
   return fetchWithAuth("/products", {
     method: "POST",
@@ -86,10 +86,16 @@ export async function createProduct(payload: Omit<Product, "id">): Promise<Produ
   });
 }
 
-// ✅ NEU: Produkt löschen
 export async function deleteProduct(productId: string) {
   return fetchWithAuth(`/products/${productId}`, {
     method: "DELETE",
+  });
+}
+
+export async function updateProduct(id: string, payload: Partial<Product>): Promise<Product> {
+  return fetchWithAuth(`/products/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 }
 
@@ -110,6 +116,7 @@ export async function deleteClient(clientId: string) {
     method: "DELETE",
   });
 }
+
 export async function updateClient(id: string, name: string): Promise<Client> {
   return fetchWithAuth(`/clients/${id}`, {
     method: "PUT",
@@ -118,6 +125,10 @@ export async function updateClient(id: string, name: string): Promise<Client> {
 }
 
 /* --- ORDERS --- */
+export async function getAllOrders() {
+  return fetchWithAuth("/orders", { cache: "no-store" });
+}
+
 export async function getOrdersByClient(clientId: string) {
   return fetchWithAuth(`/clients/${clientId}/orders`, {
     cache: "no-store",
@@ -150,6 +161,31 @@ export async function getDashboardStats() {
   return fetchWithAuth("/dashboard/stats", { cache: "no-store" });
 }
 
+/* --- INVENTORY --- */
+export async function getInventory() {
+  return fetchWithAuth("/inventory", { cache: "no-store" });
+}
+
+export async function addInventoryItem(payload: any) {
+  return fetchWithAuth("/inventory", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateInventoryQuantity(id: string, quantity: number) {
+  return fetchWithAuth(`/inventory/${id}/quantity`, {
+    method: "PATCH",
+    body: JSON.stringify({ quantity }),
+  });
+}
+
+export async function deleteInventoryItem(id: string) {
+  return fetchWithAuth(`/inventory/${id}`, {
+    method: "DELETE",
+  });
+}
+
 /* --- PDF DOWNLOAD --- */
 export async function downloadOrderPdf(orderId: string) {
   const supabase = createBrowserClient(
@@ -159,6 +195,7 @@ export async function downloadOrderPdf(orderId: string) {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token || "";
 
+  // Auch hier nutzen wir API_BASE_URL (127.0.0.1)
   const res = await fetch(`${API_BASE_URL}/orders/${orderId}/pdf`, {
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -170,12 +207,4 @@ export async function downloadOrderPdf(orderId: string) {
   }
 
   return res.blob();
-}
-
-// ✅ NEU: Produkt aktualisieren
-export async function updateProduct(id: string, payload: Partial<Product>): Promise<Product> {
-  return fetchWithAuth(`/products/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
 }
