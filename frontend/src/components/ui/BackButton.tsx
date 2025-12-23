@@ -6,8 +6,9 @@ export default function BackButton() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // ✅ Logik: Ausblenden auf Startseite, Client-Liste UND Login
-  if (pathname === "/" || pathname === "/clients" || pathname === "/login") {
+  // FIX: Button nur auf dem Dashboard ("/") und Login ausblenden.
+  // Auf "/clients" soll er jetzt sichtbar sein!
+  if (pathname === "/" || pathname === "/login") {
     return null;
   }
 

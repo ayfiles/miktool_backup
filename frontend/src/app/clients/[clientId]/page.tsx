@@ -1,4 +1,4 @@
-import { getOrdersByClient } from "@/lib/api";
+import { createOrder, getOrdersByClient } from "@/lib/api"; // createOrder muss hier dabei sein!
 import ClientOrdersClient from "@/components/order/ClientOrdersClient";
 
 interface Props {

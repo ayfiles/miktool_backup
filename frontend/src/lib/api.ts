@@ -1,109 +1,132 @@
 import { Product } from "@/types/product";
 import { Client } from "@/types/client";
+import { createBrowserClient } from "@supabase/ssr";
 
 const API_BASE_URL = "http://localhost:3001";
 
-/* -----------------------------
-   PRODUCTS
------------------------------ */
-export async function getProducts(): Promise<Product[]> {
-  const res = await fetch(`${API_BASE_URL}/products`, {
-    cache: "no-store",
-  });
+/* =========================================
+   HELPER: FETCH WITH AUTH
+   Holt den Token automatisch (Client & Server)
+========================================= */
+async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+  let token = "";
 
-  if (!res.ok) {
-    throw new Error("Failed to fetch products");
+  // A) Sind wir im Browser? (Client Component)
+  if (typeof window !== "undefined") {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data } = await supabase.auth.getSession();
+    token = data.session?.access_token || "";
+  } 
+  // B) Sind wir auf dem Server? (Server Component)
+  else {
+    // Dynamischer Import, damit der Build im Browser nicht crasht
+    const { cookies } = await import("next/headers");
+    const { createServerClient } = await import("@supabase/ssr");
+    
+    const cookieStore = await cookies();
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return cookieStore.getAll() },
+          setAll() {} // Brauchen wir hier nicht
+        }
+      }
+    );
+    
+    const { data } = await supabase.auth.getSession();
+    token = data.session?.access_token || "";
   }
 
-  return res.json();
+  // Request absenden mit Token
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      ...options.headers,
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`, // ✅ Hier ist der Ausweis
+    },
+  });
+
+  // Fehlerbehandlung zentral
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    console.error(`API Error [${endpoint}]:`, errorData);
+    
+    // Wenn 401/403 -> Logout erzwingen oder Fehler werfen
+    throw new Error(errorData.error || `Request failed: ${res.status}`);
+  }
+
+  // Bei DELETE oder leerem Body kein JSON parsen
+  if (res.status === 204) return;
+  
+  // Versuchen JSON zu parsen, sonst Text zurückgeben (oder ignorieren)
+  const text = await res.text();
+  return text ? JSON.parse(text) : {};
 }
 
-/* -----------------------------
-   CLIENTS
------------------------------ */
+
+/* =========================================
+   API FUNCTIONS (Jetzt viel sauberer!)
+========================================= */
+
+/* --- PRODUCTS --- */
+export async function getProducts(): Promise<Product[]> {
+  return fetchWithAuth("/products", { cache: "no-store" });
+}
+
+/* --- CLIENTS --- */
 export async function getClients() {
-  const res = await fetch(`${API_BASE_URL}/clients`, {
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch clients");
-  }
-
-  return res.json();
+  return fetchWithAuth("/clients", { cache: "no-store" });
 }
 
 export async function createClient(name: string): Promise<Client> {
-  const res = await fetch(`${API_BASE_URL}/clients`, {
+  return fetchWithAuth("/clients", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
-
-  if (!res.ok) {
-    throw new Error("Failed to create client");
-  }
-
-  return res.json();
 }
 
 export async function deleteClient(clientId: string) {
-  const res = await fetch(`${API_BASE_URL}/clients/${clientId}`, {
+  return fetchWithAuth(`/clients/${clientId}`, {
     method: "DELETE",
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || "Failed to delete client");
-  }
 }
 
-/* -----------------------------
-   ORDERS
------------------------------ */
+/* --- ORDERS --- */
 export async function getOrdersByClient(clientId: string) {
-  const res = await fetch(
-    `${API_BASE_URL}/clients/${clientId}/orders`,
-    {
-      cache: "no-store",
-      next: { revalidate: 0 },
-    }
-  );
+  return fetchWithAuth(`/clients/${clientId}/orders`, {
+    cache: "no-store",
+    next: { revalidate: 0 },
+  });
+}
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Orders API error:", text);
-    throw new Error("Failed to fetch orders");
-  }
-
-  return res.json();
+export async function createOrder(payload: { clientId: string; items: any[] }) {
+  return fetchWithAuth("/orders", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function deleteOrder(orderId: string) {
-  const res = await fetch(
-    `${API_BASE_URL}/orders/${orderId}`,
-    {
-      method: "DELETE",
-    }
-  );
-
-  if (!res.ok) {
-    throw new Error("Failed to delete order");
-  }
+  return fetchWithAuth(`/orders/${orderId}`, {
+    method: "DELETE",
+  });
 }
 
-// ✅ NEU: Status Update Funktion
 export async function updateOrderStatus(orderId: string, status: string) {
-  const res = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
+  return fetchWithAuth(`/orders/${orderId}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
   });
+}
 
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || "Failed to update order status");
-  }
-
-  return res.json();
+/* --- DASHBOARD --- */
+export async function getDashboardStats() {
+  return fetchWithAuth("/dashboard/stats", { cache: "no-store" });
 }
