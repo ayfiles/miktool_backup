@@ -208,3 +208,15 @@ export async function downloadOrderPdf(orderId: string) {
 
   return res.blob();
 }
+
+/* --- SETTINGS (NEU!) --- */
+export async function getSettings() {
+  return fetchWithAuth("/settings", { cache: "no-store" });
+}
+
+export async function updateSettings(payload: any) {
+  return fetchWithAuth("/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Box, 
   Plus, 
@@ -38,7 +38,13 @@ interface InventoryItem {
 export default function InventoryClient({ initialItems }: { initialItems: InventoryItem[] }) {
   const [items, setItems] = useState(initialItems);
   const [query, setQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(false); // Modal state
+  const [isOpen, setIsOpen] = useState(false);
+  
+  // ✅ FIX: Hydration Error vermeiden
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Form State
   const [newItem, setNewItem] = useState({ name: "", category: "General", sku: "", quantity: 0, min_quantity: 5 });
@@ -87,6 +93,12 @@ export default function InventoryClient({ initialItems }: { initialItems: Invent
     } catch (e) {
       toast.error("Failed to delete item");
     }
+  }
+
+  // ✅ Wenn noch nicht im Browser, nichts rendern (verhindert den Fehler)
+  if (!isMounted) {
+    return null; 
+    // Alternativ: return <div className="p-8">Loading inventory...</div>;
   }
 
   return (
