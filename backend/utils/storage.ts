@@ -1,6 +1,6 @@
 import { mkdir, writeFile, access } from 'fs/promises';
 import { join } from 'path';
-import { Order } from "../types/order";
+import { Order } from '../types/order'; // ✅ FIX 1: Importiert jetzt aus dem Backend-Ordner
 
 const STORAGE_DIR = join(__dirname, '../storage/orders');
 
@@ -19,10 +19,11 @@ async function directoryExists(path: string): Promise<boolean> {
 /**
  * Saves an order to the filesystem
  * @param order - Validated order to save
- * @throws Error if orderId folder already exists
+ * @throws Error if order folder already exists
  */
 export async function saveOrder(order: Order): Promise<void> {
-  const orderDir = join(STORAGE_DIR, order.orderId);
+  // ✅ FIX 2: "orderId" zu "id" geändert
+  const orderDir = join(STORAGE_DIR, order.id);
 
   // Check if order already exists
   if (await directoryExists(orderDir)) {
@@ -36,7 +37,3 @@ export async function saveOrder(order: Order): Promise<void> {
   const orderPath = join(orderDir, 'order.json');
   await writeFile(orderPath, JSON.stringify(order, null, 2), 'utf-8');
 }
-
-
-
-

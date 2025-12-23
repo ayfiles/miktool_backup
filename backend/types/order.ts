@@ -1,4 +1,3 @@
-// backend/types/order.ts
 export interface OrderItem {
     id: string;
     product_id: string;
