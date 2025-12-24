@@ -6,12 +6,19 @@ export async function generateHtmlPdf(order: any) {
   const settings = await getSettings();
 
   // 2. Browser starten
+  import puppeteer from 'puppeteer';
+
+  // ... in deiner Funktion ...
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+    ],
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, // WICHTIG!
   });
-  const page = await browser.newPage();
-
   // 3. HTML generieren (Jetzt mit Variablen aus 'settings'!)
   const htmlContent = `
     <!DOCTYPE html>
