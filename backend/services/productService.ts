@@ -5,10 +5,10 @@ import { v4 as uuid } from "uuid";
    GET ALL PRODUCTS (Mit Live-Stock & Low-Stock Check)
 ================================ */
 export async function getAllProducts() {
-  // Wir holen das Produkt UND quantity + min_quantity aus dem Inventory
+  // 🟢 UPDATE: Wir laden jetzt auch 'product_assets(*)' für den Konfigurator mit!
   const { data, error } = await supabase
     .from("products")
-    .select("*, inventory(quantity, min_quantity)") 
+    .select("*, inventory(quantity, min_quantity), product_assets(*)") 
     .order("name", { ascending: true });
 
   if (error) throw error;
@@ -29,7 +29,8 @@ export async function getAllProducts() {
       ...product,
       stock: totalStock,
       isLowStock: hasLowStock, // ✅ Flag für das Frontend Badging
-      inventoryCount: inventory.length
+      inventoryCount: inventory.length,
+      product_assets: product.product_assets || [] // Sicherstellen, dass es immer ein Array ist
     };
   });
 }
@@ -38,7 +39,7 @@ export async function getAllProducts() {
    GET PRODUCT BY ID (Updated)
 ================================ */
 export async function getProductById(id: string) {
-  // ✅ UPDATE: Wir laden jetzt auch 'product_assets' mit!
+  // ✅ UPDATE: Wir laden auch hier 'product_assets' mit!
   const { data, error } = await supabase
     .from("products")
     .select("*, inventory(*), product_assets(*)") 

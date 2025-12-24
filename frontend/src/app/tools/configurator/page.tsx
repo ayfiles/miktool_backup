@@ -1,54 +1,65 @@
 "use client"
 
 import * as React from "react"
-// 👇 Dieser Import hat gefehlt:
 import { Separator } from "@/components/ui/separator"
-import { Card } from "@/components/ui/card" 
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Download, RefreshCw } from "lucide-react"
+import { Download, RefreshCw, Loader2 } from "lucide-react"
 import { ConfiguratorCanvas } from "@/components/tools/ConfiguratorCanvas"
 import { toast } from "sonner"
-// import { getAllProducts, getProductById } from "@/lib/api" 
-
-// --- MOCK DATA ---
-const MOCK_PRODUCTS = [
-  { 
-    id: "p1", 
-    name: "Heavy Cotton Tee", 
-    assets: [
-      { view: "front", color: "white", url: "https://via.placeholder.com/500x500/f0f0f0/000000?text=Tee+Front+White" },
-      { view: "back", color: "white", url: "https://via.placeholder.com/500x500/f0f0f0/000000?text=Tee+Back+White" },
-      { view: "front", color: "black", url: "https://via.placeholder.com/500x500/1a1a1a/ffffff?text=Tee+Front+Black" },
-    ]
-  },
-  { 
-    id: "p2", 
-    name: "Premium Hoodie", 
-    assets: [
-       { view: "front", color: "navy", url: "https://via.placeholder.com/500x500/000080/ffffff?text=Hoodie+Front+Navy" }
-    ] 
-  },
-]
+import { getProducts } from "@/lib/api"
+import { Product } from "@/types/product"
+import Konva from "konva"
+// 👇 NEU: jsPDF importieren
+import { jsPDF } from "jspdf"
 
 export default function ConfiguratorPage() {
-  const [selectedProductId, setSelectedProductId] = React.useState<string>(MOCK_PRODUCTS[0].id)
-  const [selectedColor, setSelectedColor] = React.useState<string>("white")
+  const [products, setProducts] = React.useState<Product[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [selectedProductId, setSelectedProductId] = React.useState<string>("")
+  const [selectedColor, setSelectedColor] = React.useState<string>("")
   const [selectedView, setSelectedView] = React.useState<string>("front")
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null)
 
-  const currentProduct = MOCK_PRODUCTS.find(p => p.id === selectedProductId)
-  
-  const currentAsset = currentProduct?.assets.find(
-    a => a.color === selectedColor && a.view === selectedView
-  ) || currentProduct?.assets[0]
+  const stageRef = React.useRef<Konva.Stage>(null)
 
-  const baseImage = currentAsset ? currentAsset.url : null
+  React.useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getProducts()
+        setProducts(data)
+        if (data.length > 0) {
+          setSelectedProductId(data[0].id)
+          const firstAsset = data[0].product_assets?.[0]
+          if (firstAsset?.color) setSelectedColor(firstAsset.color)
+        }
+      } catch (error) {
+        console.error("Failed to load products:", error)
+        toast.error("Could not load products.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  const currentProduct = products.find(p => p.id === selectedProductId)
+  const availableAssets = currentProduct?.product_assets || []
+  const availableColors = Array.from(new Set(availableAssets.map(a => a.color).filter(Boolean))) as string[]
+  
+  const currentAsset = availableAssets.find(
+    a => a.color === selectedColor && a.view === selectedView
+  ) || availableAssets[0]
+
+  const baseImage = currentAsset ? currentAsset.base_image : null
 
   const handleProductChange = (id: string) => {
     setSelectedProductId(id)
+    const prod = products.find(p => p.id === id)
+    const firstColor = prod?.product_assets?.[0]?.color
+    if (firstColor) setSelectedColor(firstColor)
   }
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,6 +69,74 @@ export default function ConfiguratorPage() {
       setLogoUrl(url)
       toast.success("Logo uploaded successfully")
     }
+  }
+
+  // 👇 NEU: PDF Generierung statt Bild-Download
+  const handleDownload = () => {
+    if (!stageRef.current) return
+
+    try {
+      // 1. Canvas zu Bild konvertieren (Hohe Qualität)
+      const imgData = stageRef.current.toDataURL({ 
+          pixelRatio: 2 
+      })
+
+      // 2. PDF erstellen (A4 Format)
+      const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4"
+      })
+
+      // 3. Header & Metadaten schreiben
+      const now = new Date().toLocaleDateString()
+      
+      pdf.setFontSize(22)
+      pdf.text("Product Design Preview", 20, 20)
+      
+      pdf.setFontSize(10)
+      pdf.setTextColor(100)
+      pdf.text(`Created on: ${now}`, 20, 26)
+
+      // Produkt Details Box
+      pdf.setDrawColor(200)
+      pdf.setFillColor(245, 245, 245)
+      pdf.rect(20, 35, 170, 25, "F") // Graue Box
+
+      pdf.setFontSize(12)
+      pdf.setTextColor(0)
+      pdf.text(`Product:  ${currentProduct?.name || "Unknown"}`, 25, 45)
+      pdf.text(`Variant:  ${selectedColor} / ${selectedView}`, 25, 52)
+
+      // 4. Das Bild einfügen
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const margin = 20
+      const imgWidth = pageWidth - (margin * 2) // Volle Breite minus Margins
+      const imgHeight = imgWidth // Da unser Canvas quadratisch (1:1) ist
+
+      pdf.addImage(imgData, "PNG", margin, 70, imgWidth, imgHeight)
+
+      // Footer
+      pdf.setFontSize(10)
+      pdf.setTextColor(150)
+      pdf.text("Generated by Miktool Inc.", margin, 280)
+
+      // 5. Speichern
+      pdf.save(`design-${currentProduct?.name}-${selectedColor}.pdf`)
+      
+      toast.success("PDF saved successfully!")
+    } catch (err) {
+      console.error(err)
+      toast.error("Failed to generate PDF")
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -78,7 +157,7 @@ export default function ConfiguratorPage() {
                   <SelectValue placeholder="Select Product" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MOCK_PRODUCTS.map(p => (
+                  {products.map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -88,12 +167,13 @@ export default function ConfiguratorPage() {
             <div className="grid grid-cols-2 gap-4">
                <div className="space-y-2">
                   <Label>Color</Label>
-                  <Select value={selectedColor} onValueChange={setSelectedColor}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select value={selectedColor || ""} onValueChange={setSelectedColor} disabled={availableColors.length === 0}>
+                    <SelectTrigger><SelectValue placeholder="Color" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="white">White</SelectItem>
-                      <SelectItem value="black">Black</SelectItem>
-                      <SelectItem value="navy">Navy</SelectItem>
+                      {availableColors.map(c => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                      {availableColors.length === 0 && <SelectItem value="none" disabled>No colors</SelectItem>}
                     </SelectContent>
                   </Select>
                </div>
@@ -133,26 +213,33 @@ export default function ConfiguratorPage() {
               >
                   <RefreshCw className="mr-2 h-4 w-4" /> Reset
               </Button>
-              <Button className="flex-1">
-                  <Download className="mr-2 h-4 w-4" /> Save
+              <Button className="flex-1" onClick={handleDownload}>
+                  <Download className="mr-2 h-4 w-4" /> PDF Export
               </Button>
           </div>
         </div>
 
         {/* RIGHT PANEL: Live Preview */}
-        <div className="flex-1 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col items-center justify-center p-8">
-           <div className="shadow-2xl rounded-lg overflow-hidden border bg-white">
-              <ConfiguratorCanvas 
-                baseImageUrl={baseImage} 
-                logoUrl={logoUrl} 
-              />
+        <div className="flex-1 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col items-center justify-center p-8 overflow-auto">
+           <div className="shadow-2xl rounded-lg overflow-hidden border bg-white min-h-[500px] min-w-[500px] flex items-center justify-center">
+              {baseImage ? (
+                  <ConfiguratorCanvas 
+                    ref={stageRef} 
+                    baseImageUrl={baseImage} 
+                    logoUrl={logoUrl} 
+                  />
+              ) : (
+                  <div className="text-muted-foreground text-sm">Select a product to view preview</div>
+              )}
            </div>
-           <p className="text-sm text-muted-foreground mt-6 flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-              Interactive Preview: Drag & resize the logo.
-           </p>
+           
+           {baseImage && (
+             <p className="text-sm text-muted-foreground mt-6 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                Interactive Preview: Drag & resize the logo.
+             </p>
+           )}
         </div>
-
       </div>
   )
 }
