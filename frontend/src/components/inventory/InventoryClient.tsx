@@ -20,7 +20,8 @@ import {
   Tag,
   Barcode,
   RefreshCw,
-  Loader2
+  Loader2,
+  Edit
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -31,6 +32,8 @@ import {
   getInventory 
 } from "@/lib/api";
 import CreateInventoryItemDialog from "./CreateInventoryItemDialog";
+// ✅ NEU: Import des Edit-Dialogs
+import EditInventoryItemDialog from "./EditInventoryItemDialog";
 
 type InventoryItem = {
   id: string;
@@ -41,6 +44,10 @@ type InventoryItem = {
   min_quantity?: number;
   branch?: string;
   fabric?: string;
+  // Weitere Felder für den Dialog:
+  gsm?: string;
+  fit?: string;
+  gender?: string;
 };
 
 type Props = {
@@ -52,6 +59,10 @@ export default function InventoryClient({ initialInventory }: Props) {
   const [query, setQuery] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+
+  // ✅ NEU: State für den Edit-Modus
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   // 🔄 Daten vom Server frisch laden
   async function refreshData() {
@@ -131,6 +142,12 @@ export default function InventoryClient({ initialInventory }: Props) {
     }
   }
 
+  // ✅ NEU: Handler zum Öffnen des Edit-Dialogs
+  function openEditDialog(item: InventoryItem) {
+    setEditingItem(item);
+    setIsEditOpen(true);
+  }
+
   const getStockStatus = (qty: number, minQty: number = 10) => {
     if (qty === 0) return <Badge variant="destructive">Out of Stock</Badge>;
     if (qty <= minQty) return <Badge variant="secondary" className="text-orange-600 bg-orange-50">Low Stock</Badge>;
@@ -152,7 +169,6 @@ export default function InventoryClient({ initialInventory }: Props) {
         </div>
         
         <div className="flex items-center gap-2">
-          {/* SYNC BUTTON */}
           <Button 
             variant="outline" 
             onClick={handleSync} 
@@ -163,7 +179,6 @@ export default function InventoryClient({ initialInventory }: Props) {
             Sync with Catalog
           </Button>
 
-          {/* ADD ITEM DIALOG */}
           <CreateInventoryItemDialog onItemCreated={refreshData} />
         </div>
       </div>
@@ -264,6 +279,16 @@ export default function InventoryClient({ initialInventory }: Props) {
                     </TableCell>
 
                     <TableCell className="text-right">
+                      {/* ✅ NEU: Edit Button öffnet Dialog */}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-blue-600 mr-1"
+                        onClick={() => openEditDialog(item)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -281,6 +306,15 @@ export default function InventoryClient({ initialInventory }: Props) {
           </Table>
         </div>
       </div>
+
+      {/* ✅ NEU: Edit Dialog Component */}
+      <EditInventoryItemDialog 
+        open={isEditOpen} 
+        onOpenChange={setIsEditOpen} 
+        item={editingItem} 
+        onItemUpdated={refreshData} 
+      />
+
     </div>
   );
 }

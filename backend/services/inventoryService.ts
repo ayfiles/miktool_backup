@@ -133,3 +133,28 @@ export async function deleteInventoryItem(id: string) {
   const { error } = await supabase.from("inventory").delete().eq("id", id);
   if (error) throw error;
 }
+
+// backend/services/inventoryService.ts
+
+export async function updateInventoryItem(id: string, updates: any) {
+    const { data, error } = await supabase
+      .from("inventory")
+      .update({
+        name: updates.name,
+        category: updates.category,
+        sku: updates.sku,
+        min_quantity: updates.min_quantity,
+        branch: updates.branch,
+        gender: updates.gender,
+        fit: updates.fit,
+        fabric: updates.fabric,
+        gsm: updates.gsm,
+        quantity: updates.quantity // <--- NEU: Menge darf jetzt bearbeitet werden
+      })
+      .eq("id", id)
+      .select()
+      .single();
+  
+    if (error) throw error;
+    return data;
+  }

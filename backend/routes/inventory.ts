@@ -5,6 +5,7 @@ import {
   updateInventoryQuantity,
   deleteInventoryItem,
   syncInventoryWithProducts, // ✅ NEU: Import hinzugefügt
+  updateInventoryItem, // ✅ NEU: Import hinzugefügt
 } from "../services/inventoryService";
 
 const router = Router();
@@ -51,6 +52,16 @@ router.patch("/:id/quantity", async (req, res) => {
   try {
     const item = await updateInventoryQuantity(req.params.id, quantity);
     res.json(item);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// UPDATE INVENTORY ITEM
+router.put("/:id", async (req, res) => {
+  try {
+    const updated = await updateInventoryItem(req.params.id, req.body);
+    res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

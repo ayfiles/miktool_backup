@@ -220,3 +220,12 @@ export async function updateSettings(p: any) {
   }); 
 }
 
+// In frontend/src/lib/api.ts
+
+export async function updateInventoryItem(id: string, payload: any) {
+  // Wir nutzen fetchWithAuth, damit der Token automatisch mitgesendet wird
+  return fetchWithAuth(`/inventory/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
