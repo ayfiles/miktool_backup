@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createProduct } from "@/lib/api"; 
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,22 +26,28 @@ type Props = {
 export default function CreateProductDialog({ onProductCreated }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  
-  // ✅ FIX: Hydration Error verhindern
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Form States
+  // Erweitertes Form State für die SevenHills Attribute
   const [formData, setFormData] = useState({
     name: "",
     category: "",
     description: "",
     colors: "",
     sizes: "",
-    base_price: ""
+    base_price: "",
+    // ✅ NEUE FELDER
+    branch: "",
+    gender: "",
+    fit: "",
+    fabric: "",
+    gsm: "",
+    technical_drawing_url: "",
+    ghost_mannequin_url: ""
   });
 
   const handleChange = (field: string, value: string) => {
@@ -53,7 +59,6 @@ export default function CreateProductDialog({ onProductCreated }: Props) {
     setLoading(true);
 
     try {
-      // Helper: String "Rot, Blau" -> Array ["Rot", "Blau"]
       const cleanArray = (str: string) => 
         str.split(",").map((s) => s.trim()).filter((s) => s !== "");
 
@@ -64,143 +69,126 @@ export default function CreateProductDialog({ onProductCreated }: Props) {
         available_colors: cleanArray(formData.colors),
         available_sizes: cleanArray(formData.sizes),
         base_price: parseFloat(formData.base_price) || 0,
+        // ✅ NEUE FELDER im Payload
+        branch: formData.branch,
+        gender: formData.gender,
+        fit: formData.fit,
+        fabric: formData.fabric,
+        gsm: formData.gsm,
+        technical_drawing_url: formData.technical_drawing_url,
+        ghost_mannequin_url: formData.ghost_mannequin_url
       };
 
-      const newProduct = await createProduct(payload);
+      const newProduct = await createProduct(payload as any);
 
-      toast.success("Product created successfully");
-      
-      if (onProductCreated) {
-        onProductCreated(newProduct);
-      }
-
+      toast.success("Produkt erfolgreich erstellt");
+      if (onProductCreated) onProductCreated(newProduct);
       setOpen(false);
       
-      // Reset Form
+      // Reset
       setFormData({
-        name: "",
-        category: "",
-        description: "",
-        colors: "",
-        sizes: "",
-        base_price: ""
+        name: "", category: "", description: "", colors: "", sizes: "", base_price: "",
+        branch: "", gender: "", fit: "", fabric: "", gsm: "",
+        technical_drawing_url: "", ghost_mannequin_url: ""
       });
 
     } catch (error: any) {
-      toast.error("Failed to create product");
+      toast.error("Fehler beim Erstellen");
       console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ FIX: Solange nicht "gemountet" (Client-Side), zeigen wir nur einen Button.
-  // Das verhindert den ID-Konflikt mit dem Server.
-  if (!isMounted) {
-    return (
-      <Button>
-        <Plus className="mr-2 h-4 w-4" />
-        Add Product
-      </Button>
-    );
-  }
+  if (!isMounted) return <Button><Plus className="mr-2 h-4 w-4" /> Add Product</Button>;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Product
-        </Button>
+        <Button><Plus className="mr-2 h-4 w-4" /> Add Product</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create New Product</DialogTitle>
-            <DialogDescription>
-              Add a new item to your catalog.
-            </DialogDescription>
+            <DialogTitle>Neues Produkt anlegen</DialogTitle>
+            <DialogDescription>Manuelle Erfassung der SevenHills Produktdaten.</DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            {/* Name */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">Name *</Label>
-              <Input 
-                id="name" 
-                value={formData.name} 
-                onChange={(e) => handleChange("name", e.target.value)} 
-                className="col-span-3" 
-                required 
-              />
+          <div className="grid gap-6 py-4">
+            {/* Basis Info Section */}
+            <div className="space-y-4">
+                <h3 className="text-sm font-bold uppercase text-muted-foreground flex items-center gap-2">
+                    <Info size={14}/> Basis Informationen
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="name">Produktname *</Label>
+                        <Input id="name" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} required />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="category">Kategorie</Label>
+                        <Input id="category" value={formData.category} onChange={(e) => handleChange("category", e.target.value)} placeholder="z.B. Hemden" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="base_price">Preis (netto)</Label>
+                        <Input id="base_price" type="number" step="0.01" value={formData.base_price} onChange={(e) => handleChange("base_price", e.target.value)} placeholder="0.00" />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="branch">Branche</Label>
+                        <Input id="branch" value={formData.branch} onChange={(e) => handleChange("branch", e.target.value)} placeholder="z.B. Küche" />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="gender">Geschlecht</Label>
+                        <Input id="gender" value={formData.gender} onChange={(e) => handleChange("gender", e.target.value)} placeholder="Universal / Herren" />
+                    </div>
+                </div>
             </div>
 
-            {/* Category */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="category" className="text-right">Category</Label>
-              <Input 
-                id="category" 
-                value={formData.category} 
-                onChange={(e) => handleChange("category", e.target.value)} 
-                className="col-span-3" 
-                placeholder="e.g. Apparel" 
-              />
+            {/* Textil Details Section */}
+            <div className="space-y-4 pt-4 border-t border-border">
+                <h3 className="text-sm font-bold uppercase text-muted-foreground">Textil Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="fabric">Stoffzusammensetzung</Label>
+                        <Input id="fabric" value={formData.fabric} onChange={(e) => handleChange("fabric", e.target.value)} placeholder="z.B. 100% Cotton" />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="gsm">Grammatur (GSM)</Label>
+                        <Input id="gsm" value={formData.gsm} onChange={(e) => handleChange("gsm", e.target.value)} placeholder="z.B. 180 GSM" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="fit">Passform (Fit)</Label>
+                        <Input id="fit" value={formData.fit} onChange={(e) => handleChange("fit", e.target.value)} placeholder="Regular / Oversize" />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="sizes">Verfügbare Größen</Label>
+                        <Input id="sizes" value={formData.sizes} onChange={(e) => handleChange("sizes", e.target.value)} placeholder="S, M, L (Komma getrennt)" />
+                    </div>
+                </div>
             </div>
 
-            {/* Price */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="base_price" className="text-right">Price (€)</Label>
-              <Input 
-                id="base_price" 
-                type="number"
-                step="0.01"
-                value={formData.base_price} 
-                onChange={(e) => handleChange("base_price", e.target.value)} 
-                className="col-span-3" 
-                placeholder="0.00" 
-              />
-            </div>
-
-            {/* Colors */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="colors" className="text-right">Colors</Label>
-              <Input 
-                id="colors" 
-                value={formData.colors} 
-                onChange={(e) => handleChange("colors", e.target.value)} 
-                className="col-span-3" 
-                placeholder="Red, Blue, Black" 
-              />
-            </div>
-            
-            {/* Sizes */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="sizes" className="text-right">Sizes</Label>
-              <Input 
-                id="sizes" 
-                value={formData.sizes} 
-                onChange={(e) => handleChange("sizes", e.target.value)} 
-                className="col-span-3" 
-                placeholder="S, M, L, XL" 
-              />
-            </div>
-
-            {/* Description */}
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="description" className="text-right pt-2">Desc</Label>
-              <Textarea 
-                id="description" 
-                value={formData.description} 
-                onChange={(e) => handleChange("description", e.target.value)} 
-                className="col-span-3" 
-              />
+            {/* Assets & Media Section */}
+            <div className="space-y-4 pt-4 border-t border-border">
+                <h3 className="text-sm font-bold uppercase text-muted-foreground">Media & Zeichnungen</h3>
+                <div className="grid gap-2">
+                    <Label htmlFor="technical_drawing_url">Technische Zeichnung URL</Label>
+                    <Input id="technical_drawing_url" value={formData.technical_drawing_url} onChange={(e) => handleChange("technical_drawing_url", e.target.value)} placeholder="https://..." />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="ghost_mannequin_url">Ghost Mannequin URL</Label>
+                    <Input id="ghost_mannequin_url" value={formData.ghost_mannequin_url} onChange={(e) => handleChange("ghost_mannequin_url", e.target.value)} placeholder="https://..." />
+                </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="submit" disabled={loading}>
+          <DialogFooter className="pt-4 border-t border-border">
+            <Button type="submit" disabled={loading} className="w-full sm:w-auto">
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Product
+              Produkt speichern
             </Button>
           </DialogFooter>
         </form>

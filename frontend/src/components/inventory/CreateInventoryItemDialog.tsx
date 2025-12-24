@@ -2,26 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
-import { Plus, Loader2, Link as LinkIcon } from "lucide-react";
+import { Plus, Loader2, Link as LinkIcon, Info, Package } from "lucide-react";
 import { toast } from "sonner";
 import { addInventoryItem, getProducts } from "@/lib/api";
-import { Product } from "@/types/product";
 
 type Props = {
   onItemCreated: (item: any) => void;
@@ -30,198 +21,151 @@ type Props = {
 export default function CreateInventoryItemDialog({ onItemCreated }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  
-  // ✅ FIX: Hydration Error verhindern
-  // Diese Zeilen sind entscheidend!
   const [isMounted, setIsMounted] = useState(false);
-  
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Produkte für das Dropdown
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
-  // Form States
+  useEffect(() => { setIsMounted(true); }, []);
+
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
     category: "",
     quantity: "0",
-    min_quantity: "10"
+    min_quantity: "10",
+    branch: "",
+    gender: "",
+    fit: "",
+    fabric: "",
+    gsm: ""
   });
 
-  // Lade Produkte, wenn der Dialog aufgeht
   useEffect(() => {
-    if (open) {
-      loadProducts();
-    }
+    if (open) loadProducts();
   }, [open]);
 
   async function loadProducts() {
     try {
       const data = await getProducts();
       setProducts(data || []);
-    } catch (error) {
-      console.error("Failed to load products", error);
-    }
+    } catch (err) { console.error(err); }
   }
 
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
   const handleProductSelect = (productId: string) => {
-    const product = products.find(p => p.id === productId);
-    if (product) {
+    const p = products.find(x => x.id === productId);
+    if (p) {
       setSelectedProductId(productId);
-      setFormData(prev => ({
-        ...prev,
-        name: product.name, 
-        sku: product.id.slice(0, 8).toUpperCase(),
-        category: "Finished Good"
-      }));
+      setFormData({
+        ...formData,
+        name: p.name,
+        category: p.category || "Finished Good",
+        sku: p.id.slice(0, 8).toUpperCase(),
+        branch: p.branch || "",
+        gender: p.gender || "",
+        fit: p.fit || "",
+        fabric: p.fabric || "",
+        gsm: p.gsm || ""
+      });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name) return toast.error("Item name is required");
-
     setLoading(true);
     try {
       const payload = {
-        name: formData.name,
-        sku: formData.sku,
-        category: formData.category,
+        ...formData,
         quantity: parseInt(formData.quantity) || 0,
         min_quantity: parseInt(formData.min_quantity) || 10,
         product_id: selectedProductId || undefined
       };
-
       const newItem = await addInventoryItem(payload);
-      
-      toast.success("Item linked & added to inventory");
-      onItemCreated(newItem); 
+      toast.success("Inventar-Item erstellt");
+      onItemCreated(newItem);
       setOpen(false);
-      
-      setFormData({ name: "", sku: "", category: "", quantity: "0", min_quantity: "10" });
-      setSelectedProductId(null);
-
-    } catch (error: any) {
-      toast.error(error.message || "Failed to add item");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) {
+      toast.error(err.message || "Fehler");
+    } finally { setLoading(false); }
   };
 
-  // ✅ WICHTIG: Wenn die Komponente noch nicht auf dem Client ist, 
-  // rendern wir NUR den Button. Das verhindert den ID-Konflikt mit dem Server.
-  if (!isMounted) {
-    return (
-      <Button>
-        <Plus className="mr-2 h-4 w-4" /> Add Item
-      </Button>
-    );
-  }
+  if (!isMounted) return <Button><Plus className="mr-2 h-4 w-4" /> Add Item</Button>;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" /> Add Item
-        </Button>
+        <Button><Plus className="mr-2 h-4 w-4" /> Add Item</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add Inventory Item</DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          
-          <div className="grid gap-2 bg-muted/30 p-3 rounded border border-dashed">
-            <Label className="text-xs font-semibold uppercase text-muted-foreground">Link to Product (Optional)</Label>
-            <Select onValueChange={handleProductSelect}>
-              <SelectTrigger className="bg-white">
-                <SelectValue placeholder="Select a product from database..." />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedProductId && (
-               <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-                 <LinkIcon size={12} /> Linked to Product ID: {selectedProductId.slice(0,8)}...
-               </p>
-            )}
-          </div>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Inventar aufstocken</DialogTitle>
+          </DialogHeader>
 
-          <div className="grid gap-2">
-            <Label htmlFor="name">Item Name *</Label>
-            <Input 
-              id="name" 
-              placeholder="e.g. T-Shirt Heavy Cotton" 
-              value={formData.name}
-              onChange={(e) => handleChange("name", e.target.value)}
-            />
-          </div>
+          <div className="grid gap-6 py-4">
+            {/* Link Section */}
+            <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 space-y-3">
+                <Label className="text-xs font-bold text-primary uppercase">Mit Produkt verknüpfen</Label>
+                <Select onValueChange={handleProductSelect}>
+                    <SelectTrigger className="bg-background"><SelectValue placeholder="Produkt auswählen..." /></SelectTrigger>
+                    <SelectContent>
+                        {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="sku">SKU / Code</Label>
-              <Input 
-                id="sku" 
-                placeholder="TS-BLK-L" 
-                value={formData.sku}
-                onChange={(e) => handleChange("sku", e.target.value)}
-              />
+            {/* Stammdaten */}
+            <div className="space-y-4">
+                <h3 className="text-sm font-bold uppercase text-muted-foreground flex items-center gap-2"><Info size={14}/> Stammdaten</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label>Bezeichnung *</Label>
+                        <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label>SKU / Interner Code</Label>
+                        <Input value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} placeholder="z.B. SH-001" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label>Initialer Bestand</Label>
+                        <Input type="number" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label>Warnung bei (Min)</Label>
+                        <Input type="number" value={formData.min_quantity} onChange={e => setFormData({...formData, min_quantity: e.target.value})} />
+                    </div>
+                </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="category">Category</Label>
-              <Input 
-                id="category" 
-                placeholder="Raw Material" 
-                value={formData.category}
-                onChange={(e) => handleChange("category", e.target.value)}
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="quantity">Initial Stock</Label>
-              <Input 
-                id="quantity" 
-                type="number"
-                min="0"
-                value={formData.quantity}
-                onChange={(e) => handleChange("quantity", e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="min_quantity">Low Stock Warning</Label>
-              <Input 
-                id="min_quantity" 
-                type="number"
-                min="0"
-                value={formData.min_quantity}
-                onChange={(e) => handleChange("min_quantity", e.target.value)}
-              />
+            {/* SevenHills Textil Details */}
+            <div className="space-y-4 pt-4 border-t border-border">
+                <h3 className="text-sm font-bold uppercase text-muted-foreground flex items-center gap-2"><Package size={14}/> Textil Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label>Stoff</Label>
+                        <Input value={formData.fabric} onChange={e => setFormData({...formData, fabric: e.target.value})} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label>Grammatur (GSM)</Label>
+                        <Input value={formData.gsm} onChange={e => setFormData({...formData, gsm: e.target.value})} />
+                    </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="grid gap-2"><Label>Fit</Label><Input value={formData.fit} onChange={e => setFormData({...formData, fit: e.target.value})} /></div>
+                    <div className="grid gap-2"><Label>Branche</Label><Input value={formData.branch} onChange={e => setFormData({...formData, branch: e.target.value})} /></div>
+                    <div className="grid gap-2"><Label>Gender</Label><Input value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} /></div>
+                </div>
             </div>
           </div>
 
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Abbrechen</Button>
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Item
+              Item speichern
             </Button>
           </div>
-
         </form>
       </DialogContent>
     </Dialog>

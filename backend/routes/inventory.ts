@@ -4,6 +4,7 @@ import {
   addInventoryItem,
   updateInventoryQuantity,
   deleteInventoryItem,
+  syncInventoryWithProducts, // ✅ NEU: Import hinzugefügt
 } from "../services/inventoryService";
 
 const router = Router();
@@ -25,6 +26,22 @@ router.post("/", async (req, res) => {
     res.status(201).json(item);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ SYNC MIT PRODUKTKATALOG
+router.post("/sync", async (req, res) => {
+  try {
+    const result = await syncInventoryWithProducts();
+    res.json(result);
+  } catch (error: any) {
+    // Detailliertes Logging im Backend-Terminal
+    console.error("Sync Route Error:", error);
+    
+    res.status(500).json({ 
+      error: "Sync failed", 
+      details: error.message 
+    });
   }
 });
 

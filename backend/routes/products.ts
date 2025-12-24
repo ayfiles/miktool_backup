@@ -1,6 +1,12 @@
 import { Router, Request, Response } from "express";
-import { getAllProducts, getProductById, createProduct, updateProduct, deleteProduct } from "../services/productService"; // Importe erweitern!
-
+import { 
+  getAllProducts, 
+  createProduct, 
+  deleteProduct, 
+  updateProduct,
+  getProductById,
+  createBulkProducts // <--- NEU
+} from "../services/productService";
 const router = Router();
 
 // GET /products
@@ -66,6 +72,21 @@ router.post("/", async (req: Request, res: Response) => {
     const e = error as any;
     console.error("Failed to create product:", e);
     res.status(500).json({ error: e.message || "Failed to create product" });
+  }
+});
+
+// BATCH IMPORT
+router.post("/batch", async (req, res) => {
+  try {
+    const products = req.body;
+    if (!Array.isArray(products)) {
+      return res.status(400).json({ error: "Input must be an array of products" });
+    }
+    const created = await createBulkProducts(products);
+    res.status(201).json(created);
+  } catch (error) {
+    console.error("Error importing products:", error);
+    res.status(500).json({ error: "Failed to import products" });
   }
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   Table, 
   TableBody, 
@@ -18,12 +18,18 @@ import {
   Minus, 
   Trash2,
   Tag,
-  Barcode
+  Barcode,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { updateInventoryQuantity, deleteInventoryItem } from "@/lib/api";
-// NEU: Importiere den Dialog
+import { 
+  updateInventoryQuantity, 
+  deleteInventoryItem, 
+  syncInventory, 
+  getInventory 
+} from "@/lib/api";
 import CreateInventoryItemDialog from "./CreateInventoryItemDialog";
 
 type InventoryItem = {
@@ -33,6 +39,8 @@ type InventoryItem = {
   category?: string;
   quantity: number;
   min_quantity?: number;
+  branch?: string;
+  fabric?: string;
 };
 
 type Props = {
@@ -43,6 +51,17 @@ export default function InventoryClient({ initialInventory }: Props) {
   const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory || []);
   const [query, setQuery] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  // 🔄 Daten vom Server frisch laden
+  async function refreshData() {
+    try {
+      const data = await getInventory();
+      setInventory(data);
+    } catch (error) {
+      console.error("Refresh failed", error);
+    }
+  }
 
   // 🔍 Filter Logik
   const filteredInventory = useMemo(() => {
@@ -53,14 +72,29 @@ export default function InventoryClient({ initialInventory }: Props) {
       const matchName = item.name?.toLowerCase().includes(q);
       const matchSku = item.sku?.toLowerCase().includes(q);
       const matchCategory = item.category?.toLowerCase().includes(q);
-      return matchName || matchSku || matchCategory;
+      const matchFabric = item.fabric?.toLowerCase().includes(q);
+      return matchName || matchSku || matchCategory || matchFabric;
     });
   }, [inventory, query]);
 
-  // 🔄 Callback wenn neues Item erstellt wurde
-  const handleItemCreated = (newItem: InventoryItem) => {
-    setInventory((prev) => [newItem, ...prev]);
-  };
+  // 🔄 Sync mit Produktkatalog
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const result = await syncInventory();
+      await refreshData();
+      
+      if (result.count > 0) {
+        toast.success(`${result.count} neue Produkte ins Lager übernommen!`);
+      } else {
+        toast.info("Lager ist bereits auf dem neuesten Stand.");
+      }
+    } catch (error) {
+      toast.error("Synchronisierung fehlgeschlagen.");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   // 🔄 Update Menge
   async function handleUpdateQuantity(id: string, currentQty: number, change: number) {
@@ -70,14 +104,12 @@ export default function InventoryClient({ initialInventory }: Props) {
     setLoadingId(id);
     try {
       await updateInventoryQuantity(id, newQty);
-      
       setInventory((prev) => 
         prev.map((item) => item.id === id ? { ...item, quantity: newQty } : item)
       );
-      toast.success("Stock updated");
+      toast.success("Bestand aktualisiert");
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to update stock");
+      toast.error("Fehler beim Update");
     } finally {
       setLoadingId(null);
     }
@@ -85,16 +117,15 @@ export default function InventoryClient({ initialInventory }: Props) {
 
   // 🗑️ Löschen
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this inventory item?")) return;
+    if (!confirm("Item wirklich aus dem Lager entfernen?")) return;
     
     setLoadingId(id);
     try {
       await deleteInventoryItem(id);
       setInventory((prev) => prev.filter((item) => item.id !== id));
-      toast.success("Item deleted");
+      toast.success("Item entfernt");
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to delete item");
+      toast.error("Löschen fehlgeschlagen");
     } finally {
       setLoadingId(null);
     }
@@ -102,8 +133,8 @@ export default function InventoryClient({ initialInventory }: Props) {
 
   const getStockStatus = (qty: number, minQty: number = 10) => {
     if (qty === 0) return <Badge variant="destructive">Out of Stock</Badge>;
-    if (qty < minQty) return <Badge variant="secondary" className="text-orange-600 bg-orange-50 hover:bg-orange-100">Low Stock</Badge>;
-    return <Badge variant="outline" className="text-green-600 bg-green-50">In Stock</Badge>;
+    if (qty <= minQty) return <Badge variant="secondary" className="text-orange-600 bg-orange-50">Low Stock</Badge>;
+    return <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">In Stock</Badge>;
   };
 
   return (
@@ -113,15 +144,28 @@ export default function InventoryClient({ initialInventory }: Props) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Package className="h-8 w-8 text-primary" /> Inventory Management
+            <Package className="h-8 w-8 text-primary" /> Inventory
           </h1>
           <p className="text-muted-foreground mt-2">
-            Track your raw materials and product stock levels.
+            Verwalte Bestände und synchronisiere sie mit deinem Produktkatalog.
           </p>
         </div>
         
-        {/* NEU: Hier ist jetzt der Button! */}
-        <CreateInventoryItemDialog onItemCreated={handleItemCreated} />
+        <div className="flex items-center gap-2">
+          {/* SYNC BUTTON */}
+          <Button 
+            variant="outline" 
+            onClick={handleSync} 
+            disabled={syncing}
+            className="gap-2"
+          >
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Sync with Catalog
+          </Button>
+
+          {/* ADD ITEM DIALOG */}
+          <CreateInventoryItemDialog onItemCreated={refreshData} />
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -130,7 +174,7 @@ export default function InventoryClient({ initialInventory }: Props) {
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, SKU or category..."
+            placeholder="Suche nach Name, SKU, Stoff oder Kategorie..."
             className="pl-10 bg-card"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -143,10 +187,10 @@ export default function InventoryClient({ initialInventory }: Props) {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[30%]">Item Name</TableHead>
-                <TableHead className="w-[15%]">SKU / Code</TableHead>
-                <TableHead className="w-[15%]">Category</TableHead>
-                <TableHead className="w-[20%]">Stock Level</TableHead>
-                <TableHead className="w-[15%]">Status</TableHead>
+                <TableHead>SKU / Code</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead>Stock Level</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -154,38 +198,37 @@ export default function InventoryClient({ initialInventory }: Props) {
               {filteredInventory.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    No items found.
+                    Keine Einträge gefunden.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredInventory.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
-                      {item.name || "Unnamed Item"}
+                      <div className="flex flex-col">
+                        <span>{item.name || "Unnamed Item"}</span>
+                        {item.branch && <span className="text-[10px] text-muted-foreground uppercase">{item.branch}</span>}
+                      </div>
                     </TableCell>
                     
                     <TableCell>
                       {item.sku ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground font-mono">
                           <Barcode className="h-3 w-3" />
-                          <span className="font-mono">{item.sku}</span>
+                          {item.sku}
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground/50">-</span>
-                      )}
+                      ) : "-"}
                     </TableCell>
                     
                     <TableCell>
-                      {item.category ? (
-                         <div className="flex items-center gap-2">
-                            <Tag className="h-3 w-3 text-muted-foreground" />
-                            <Badge variant="secondary" className="font-normal text-xs">
-                                {item.category}
-                            </Badge>
-                         </div>
-                      ) : (
-                        <span className="text-muted-foreground/50">-</span>
-                      )}
+                       <div className="flex flex-col gap-1">
+                          {item.category && (
+                            <div className="flex items-center gap-1 text-[11px]">
+                               <Tag size={10} /> {item.category}
+                            </div>
+                          )}
+                          {item.fabric && <span className="text-[10px] text-muted-foreground italic truncate max-w-[100px]">{item.fabric}</span>}
+                       </div>
                     </TableCell>
 
                     <TableCell>
@@ -193,21 +236,21 @@ export default function InventoryClient({ initialInventory }: Props) {
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-8 w-8"
+                          className="h-7 w-7"
                           disabled={loadingId === item.id || item.quantity <= 0}
                           onClick={() => handleUpdateQuantity(item.id, item.quantity, -1)}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
                         
-                        <span className={`w-12 text-center font-mono font-medium ${item.quantity < (item.min_quantity || 10) ? 'text-orange-600' : ''}`}>
+                        <span className={`w-8 text-center font-mono font-bold ${item.quantity <= (item.min_quantity || 10) ? 'text-orange-600' : ''}`}>
                           {item.quantity}
                         </span>
 
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-8 w-8"
+                          className="h-7 w-7"
                           disabled={loadingId === item.id}
                           onClick={() => handleUpdateQuantity(item.id, item.quantity, 1)}
                         >
@@ -237,11 +280,6 @@ export default function InventoryClient({ initialInventory }: Props) {
             </TableBody>
           </Table>
         </div>
-        
-        <div className="text-xs text-muted-foreground text-center">
-          Showing {filteredInventory.length} items
-        </div>
-
       </div>
     </div>
   );
