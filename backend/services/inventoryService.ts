@@ -3,11 +3,12 @@ import { v4 as uuid } from "uuid";
 
 /* ===============================
    GET INVENTORY
+   (Jetzt holen wir auch den Produkt-Namen direkt aus der Relation, falls vorhanden)
 ================================ */
 export async function getInventory() {
   const { data, error } = await supabase
     .from("inventory")
-    .select("*")
+    .select("*, product:products(name, id)") // Join mit Products
     .order("name", { ascending: true });
 
   if (error) throw error;
@@ -15,12 +16,27 @@ export async function getInventory() {
 }
 
 /* ===============================
-   ADD ITEM
+   ADD ITEM (Updated)
 ================================ */
-export async function addInventoryItem(item: { name: string; category: string; quantity: number; min_quantity: number; sku: string }) {
+export async function addInventoryItem(item: { 
+  name: string; 
+  category: string; 
+  quantity: number; 
+  min_quantity: number; 
+  sku: string;
+  product_id?: string; // ✅ NEU: Optionales Feld für die Verknüpfung
+}) {
   const { data, error } = await supabase
     .from("inventory")
-    .insert({ ...item, id: uuid() })
+    .insert({ 
+      id: uuid(),
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      min_quantity: item.min_quantity,
+      sku: item.sku,
+      product_id: item.product_id || null // ✅ Speichert die ID
+    })
     .select()
     .single();
 
@@ -29,7 +45,7 @@ export async function addInventoryItem(item: { name: string; category: string; q
 }
 
 /* ===============================
-   UPDATE QUANTITY (Stock Adjustment)
+   UPDATE QUANTITY
 ================================ */
 export async function updateInventoryQuantity(id: string, newQuantity: number) {
   const { data, error } = await supabase

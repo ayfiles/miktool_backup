@@ -1,223 +1,247 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { 
-  Box, 
-  Plus, 
-  Trash2, 
-  AlertTriangle, 
-  Search,
-  MinusCircle,
-  PlusCircle
-} from "lucide-react";
-import { toast } from "sonner";
-import { addInventoryItem, updateInventoryQuantity, deleteInventoryItem } from "@/lib/api";
-
-import { Button } from "@/components/ui/button";
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { 
+  Search, 
+  Package, 
+  Plus, 
+  Minus, 
+  Trash2,
+  Tag,
+  Barcode
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { updateInventoryQuantity, deleteInventoryItem } from "@/lib/api";
+// NEU: Importiere den Dialog
+import CreateInventoryItemDialog from "./CreateInventoryItemDialog";
 
-interface InventoryItem {
+type InventoryItem = {
   id: string;
   name: string;
-  category: string;
-  sku: string;
+  sku?: string;
+  category?: string;
   quantity: number;
-  min_quantity: number;
-}
+  min_quantity?: number;
+};
 
-export default function InventoryClient({ initialItems }: { initialItems: InventoryItem[] }) {
-  const [items, setItems] = useState(initialItems);
+type Props = {
+  initialInventory: InventoryItem[];
+};
+
+export default function InventoryClient({ initialInventory }: Props) {
+  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory || []);
   const [query, setQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  
-  // ✅ FIX: Hydration Error vermeiden
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  // Form State
-  const [newItem, setNewItem] = useState({ name: "", category: "General", sku: "", quantity: 0, min_quantity: 5 });
-
-  // 🔍 FILTER
-  const filteredItems = items.filter(item => 
-    item.name.toLowerCase().includes(query.toLowerCase()) || 
-    item.sku?.toLowerCase().includes(query.toLowerCase())
-  );
-
-  // ➕ CREATE
-  async function handleCreate() {
-    if (!newItem.name) return toast.error("Name is required");
-    try {
-      const created = await addInventoryItem(newItem);
-      setItems([...items, created]);
-      setIsOpen(false);
-      setNewItem({ name: "", category: "General", sku: "", quantity: 0, min_quantity: 5 });
-      toast.success("Item added to inventory");
-    } catch (e) {
-      toast.error("Failed to add item");
-    }
-  }
-
-  // 🔢 UPDATE STOCK
-  async function handleUpdateStock(id: string, current: number, change: number) {
-    const newQty = Math.max(0, current + change);
-    // Optimistic Update
-    setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty } : i));
+  // 🔍 Filter Logik
+  const filteredInventory = useMemo(() => {
+    const q = query.toLowerCase();
+    if (!inventory) return [];
     
+    return inventory.filter((item) => {
+      const matchName = item.name?.toLowerCase().includes(q);
+      const matchSku = item.sku?.toLowerCase().includes(q);
+      const matchCategory = item.category?.toLowerCase().includes(q);
+      return matchName || matchSku || matchCategory;
+    });
+  }, [inventory, query]);
+
+  // 🔄 Callback wenn neues Item erstellt wurde
+  const handleItemCreated = (newItem: InventoryItem) => {
+    setInventory((prev) => [newItem, ...prev]);
+  };
+
+  // 🔄 Update Menge
+  async function handleUpdateQuantity(id: string, currentQty: number, change: number) {
+    const newQty = currentQty + change;
+    if (newQty < 0) return;
+
+    setLoadingId(id);
     try {
       await updateInventoryQuantity(id, newQty);
-    } catch (e) {
+      
+      setInventory((prev) => 
+        prev.map((item) => item.id === id ? { ...item, quantity: newQty } : item)
+      );
+      toast.success("Stock updated");
+    } catch (error) {
+      console.error(error);
       toast.error("Failed to update stock");
-      // Rollback wäre hier sauberer, aber für MVP ok
+    } finally {
+      setLoadingId(null);
     }
   }
 
-  // 🗑️ DELETE
+  // 🗑️ Löschen
   async function handleDelete(id: string) {
-    if (!confirm("Remove item from inventory?")) return;
+    if (!confirm("Are you sure you want to delete this inventory item?")) return;
+    
+    setLoadingId(id);
     try {
       await deleteInventoryItem(id);
-      setItems(prev => prev.filter(i => i.id !== id));
-      toast.success("Item removed");
-    } catch (e) {
+      setInventory((prev) => prev.filter((item) => item.id !== id));
+      toast.success("Item deleted");
+    } catch (error) {
+      console.error(error);
       toast.error("Failed to delete item");
+    } finally {
+      setLoadingId(null);
     }
   }
 
-  // ✅ Wenn noch nicht im Browser, nichts rendern (verhindert den Fehler)
-  if (!isMounted) {
-    return null; 
-    // Alternativ: return <div className="p-8">Loading inventory...</div>;
-  }
+  const getStockStatus = (qty: number, minQty: number = 10) => {
+    if (qty === 0) return <Badge variant="destructive">Out of Stock</Badge>;
+    if (qty < minQty) return <Badge variant="secondary" className="text-orange-600 bg-orange-50 hover:bg-orange-100">Low Stock</Badge>;
+    return <Badge variant="outline" className="text-green-600 bg-green-50">In Stock</Badge>;
+  };
 
   return (
-    <div className="flex flex-col gap-6 pb-20">
+    <div className="w-full px-6 md:px-10 py-8 space-y-8 pb-20">
       
       {/* HEADER */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Box className="h-8 w-8" /> Inventory
+            <Package className="h-8 w-8 text-primary" /> Inventory Management
           </h1>
-          <p className="text-muted-foreground">Track raw materials and stock levels.</p>
+          <p className="text-muted-foreground mt-2">
+            Track your raw materials and product stock levels.
+          </p>
+        </div>
+        
+        {/* NEU: Hier ist jetzt der Button! */}
+        <CreateInventoryItemDialog onItemCreated={handleItemCreated} />
+      </div>
+
+      <div className="space-y-4">
+        
+        {/* SEARCH */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, SKU or category..."
+            className="pl-10 bg-card"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
 
-        {/* ADD DIALOG */}
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" /> Add Item</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Inventory Item</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Item Name</Label>
-                <Input value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="e.g. Black T-Shirt XL" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                   <Label>Category</Label>
-                   <Input value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} placeholder="e.g. Blanks" />
-                </div>
-                <div className="grid gap-2">
-                   <Label>SKU (Optional)</Label>
-                   <Input value={newItem.sku} onChange={e => setNewItem({...newItem, sku: e.target.value})} placeholder="e.g. TS-BLK-XL" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                   <Label>Initial Quantity</Label>
-                   <Input type="number" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: Number(e.target.value)})} />
-                </div>
-                <div className="grid gap-2">
-                   <Label>Low Stock Warning</Label>
-                   <Input type="number" value={newItem.min_quantity} onChange={e => setNewItem({...newItem, min_quantity: Number(e.target.value)})} />
-                </div>
-              </div>
-              <Button onClick={handleCreate} className="mt-2">Save Item</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+        {/* TABLE */}
+        <div className="rounded-md border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[30%]">Item Name</TableHead>
+                <TableHead className="w-[15%]">SKU / Code</TableHead>
+                <TableHead className="w-[15%]">Category</TableHead>
+                <TableHead className="w-[20%]">Stock Level</TableHead>
+                <TableHead className="w-[15%]">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredInventory.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    No items found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredInventory.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">
+                      {item.name || "Unnamed Item"}
+                    </TableCell>
+                    
+                    <TableCell>
+                      {item.sku ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Barcode className="h-3 w-3" />
+                          <span className="font-mono">{item.sku}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/50">-</span>
+                      )}
+                    </TableCell>
+                    
+                    <TableCell>
+                      {item.category ? (
+                         <div className="flex items-center gap-2">
+                            <Tag className="h-3 w-3 text-muted-foreground" />
+                            <Badge variant="secondary" className="font-normal text-xs">
+                                {item.category}
+                            </Badge>
+                         </div>
+                      ) : (
+                        <span className="text-muted-foreground/50">-</span>
+                      )}
+                    </TableCell>
 
-      {/* SEARCH */}
-      <div className="relative">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input 
-          className="pl-9 bg-zinc-900 border-zinc-800 w-full md:w-[300px]" 
-          placeholder="Search items..." 
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
-      </div>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          disabled={loadingId === item.id || item.quantity <= 0}
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity, -1)}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        
+                        <span className={`w-12 text-center font-mono font-medium ${item.quantity < (item.min_quantity || 10) ? 'text-orange-600' : ''}`}>
+                          {item.quantity}
+                        </span>
 
-      {/* LIST */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredItems.map((item) => {
-          const isLow = item.quantity <= item.min_quantity;
-          
-          return (
-            <Card key={item.id} className={`bg-zinc-900 border-zinc-800 ${isLow ? 'border-red-900/50 bg-red-950/10' : ''}`}>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-semibold text-lg truncate">{item.name}</h3>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                      <Badge variant="secondary" className="text-xs">{item.category}</Badge>
-                      {item.sku && <span className="font-mono text-xs opacity-50">{item.sku}</span>}
-                    </div>
-                  </div>
-                  {isLow && (
-                    <div className="flex items-center text-red-500 text-xs font-bold border border-red-500/20 bg-red-500/10 px-2 py-1 rounded">
-                      <AlertTriangle className="h-3 w-3 mr-1" /> LOW
-                    </div>
-                  )}
-                </div>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          disabled={loadingId === item.id}
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity, 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
 
-                <div className="flex items-center justify-between mt-6">
-                   <div className="text-3xl font-bold tabular-nums">
-                     {item.quantity}
-                   </div>
-                   
-                   <div className="flex items-center gap-2">
-                     <Button 
-                        variant="outline" size="icon" className="h-8 w-8"
-                        onClick={() => handleUpdateStock(item.id, item.quantity, -1)}
-                     >
-                       <MinusCircle className="h-4 w-4" />
-                     </Button>
-                     <Button 
-                        variant="outline" size="icon" className="h-8 w-8"
-                        onClick={() => handleUpdateStock(item.id, item.quantity, 1)}
-                     >
-                       <PlusCircle className="h-4 w-4" />
-                     </Button>
-                     <div className="w-px h-6 bg-zinc-800 mx-1"></div>
-                     <Button 
-                        variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                    <TableCell>
+                      {getStockStatus(item.quantity, item.min_quantity)}
+                    </TableCell>
+
+                    <TableCell className="text-right">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-red-600"
                         onClick={() => handleDelete(item.id)}
-                     >
-                       <Trash2 className="h-4 w-4" />
-                     </Button>
-                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
+                        disabled={loadingId === item.id}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        
+        <div className="text-xs text-muted-foreground text-center">
+          Showing {filteredInventory.length} items
+        </div>
+
       </div>
     </div>
   );

@@ -34,7 +34,8 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
     setLoading(true);
 
     try {
-      await updateClient(client.id, name);
+      // ✅ FIX: Wir senden jetzt ein Objekt { name } statt nur den String
+      await updateClient(client.id, { name });
       toast.success("Client updated successfully");
       onOpenChange(false);
       router.refresh();
@@ -50,9 +51,9 @@ export function EditClientDialog({ client, open, onOpenChange }: EditClientDialo
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Edit Client</DialogTitle>
+            <DialogTitle>Edit Client Name</DialogTitle>
             <DialogDescription>
-              Change the name of this client.
+              To edit address and other details, please open the client folder.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

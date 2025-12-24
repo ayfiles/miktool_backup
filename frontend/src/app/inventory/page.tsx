@@ -8,7 +8,8 @@ export default async function InventoryPage() {
 
   return (
     <div className="container mx-auto py-8 px-4">
-       <InventoryClient initialItems={items || []} />
+       {/* FIX: Prop Name von 'initialItems' zu 'initialInventory' geändert */}
+       <InventoryClient initialInventory={items || []} />
     </div>
   );
 }

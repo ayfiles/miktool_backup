@@ -68,7 +68,7 @@ export async function createOrder(input: CreateOrderInput) {
 }
 
 /* ===============================
-   GET ALL ORDERS (NEU! Für die Liste)
+   GET ALL ORDERS (Für die Hauptliste)
 ================================ */
 export async function getAllOrders() {
   const { data, error } = await supabase
@@ -78,16 +78,33 @@ export async function getAllOrders() {
       client:clients ( id, name ),
       items:order_items ( quantity )
     `)
-    .order("created_at", { ascending: false }); // Neueste zuerst
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
 
-  // Daten flachklopfen für einfachere Nutzung im Frontend
   return data.map((order) => ({
     ...order,
     clientName: order.client?.name || order.customer_name || "Unknown Client",
     itemsCount: order.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0,
   }));
+}
+
+/* ===============================
+   NEU: GET ORDERS BY CLIENT ID (Das hat gefehlt!)
+================================ */
+export async function getOrdersByClientId(clientId: string) {
+  // Wir nutzen 'items:order_items', damit das Frontend ein Array 'items' bekommt
+  const { data, error } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      items:order_items ( * ) 
+    `)
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data || [];
 }
 
 /* ===============================
@@ -136,9 +153,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
    DELETE ORDER
 ================================ */
 export async function deleteOrder(orderId: string) {
-  // Items werden via CASCADE gelöscht, aber sicherheitshalber:
   await supabase.from("order_items").delete().eq("order_id", orderId);
-  
   const { error } = await supabase
     .from("orders")
     .delete()

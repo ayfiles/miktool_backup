@@ -1,86 +1,64 @@
 import { supabase } from "../supabaseClient";
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuid } from "uuid";
 
+/* ===============================
+   GET ALL PRODUCTS (Mit Live-Stock!)
+================================ */
 export async function getAllProducts() {
+  // Wir holen das Produkt UND alle verknüpften Inventory-Items (quantity)
   const { data, error } = await supabase
     .from("products")
-    .select("*");
+    .select("*, inventory(quantity)") 
+    .order("name", { ascending: true });
 
-  if (error) {
-    console.error("❌ SUPABASE ERROR (products):", {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-    });
-    throw error;
-  }
+  if (error) throw error;
 
-  console.log("✅ PRODUCTS:", data);
-  return data;
+  // Jetzt rechnen wir die Summe aus
+  return data.map((product: any) => {
+    const realStock = product.inventory 
+      ? product.inventory.reduce((sum: number, item: any) => sum + item.quantity, 0)
+      : 0;
+
+    return {
+      ...product,
+      stock: realStock, // Wir überschreiben den statischen Wert mit dem echten
+      inventoryCount: product.inventory?.length || 0 // Wie viele Varianten gibt es?
+    };
+  });
 }
 
+/* ===============================
+   GET PRODUCT BY ID
+================================ */
 export async function getProductById(id: string) {
   const { data, error } = await supabase
     .from("products")
-    .select("*")
+    .select("*, inventory(*)")
     .eq("id", id)
-    .maybeSingle();
+    .single();
 
-  if (error) {
-    console.error("❌ SUPABASE ERROR (product by id):", {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-    });
-    throw error;
-  }
-
+  if (error) throw error;
   return data;
 }
 
-export async function createProduct(productData: {
-  name: string;
-  category?: string;
-  description?: string;
-  available_colors?: string[];
-  available_sizes?: string[];
-}) {
-  const newProduct = {
-    id: uuidv4(),
-    name: productData.name,
-    category: productData.category,
-    description: productData.description,
-    available_colors: productData.available_colors || [],
-    available_sizes: productData.available_sizes || [],
-  };
-
+/* ===============================
+   CREATE PRODUCT
+================================ */
+export async function createProduct(product: any) {
   const { data, error } = await supabase
     .from("products")
-    .insert([newProduct])
+    .insert({ ...product, id: uuid() })
     .select()
     .single();
 
-  if (error) {
-    console.error("❌ SUPABASE ERROR (create product):", error);
-    throw error;
-  }
-
+  if (error) throw error;
   return data;
 }
 
-// backend/services/productService.ts
-
-// ... bestehende Imports und Funktionen ...
-
-export async function updateProduct(id: string, updates: Partial<{
-  name: string;
-  category: string;
-  description: string;
-  available_colors: string[];
-  available_sizes: string[];
-}>) {
+/* ===============================
+   UPDATE PRODUCT
+================================ */
+export async function updateProduct(id: string, updates: any) {
   const { data, error } = await supabase
     .from("products")
     .update(updates)
@@ -88,24 +66,14 @@ export async function updateProduct(id: string, updates: Partial<{
     .select()
     .single();
 
-  if (error) {
-    console.error("❌ SUPABASE ERROR (update product):", error);
-    throw error;
-  }
-
+  if (error) throw error;
   return data;
 }
 
+/* ===============================
+   DELETE PRODUCT
+================================ */
 export async function deleteProduct(id: string) {
-  const { error } = await supabase
-    .from("products")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("❌ SUPABASE ERROR (delete product):", error);
-    throw error;
-  }
-
-  return true;
+  const { error } = await supabase.from("products").delete().eq("id", id);
+  if (error) throw error;
 }
