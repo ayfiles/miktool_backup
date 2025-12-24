@@ -1,25 +1,25 @@
 import puppeteer from "puppeteer";
-import { getSettings } from "./settingsService"; // ✅ Settings importieren
+import { getSettings } from "./settingsService"; 
 
 export async function generateHtmlPdf(order: any) {
   // 1. Settings laden
   const settings = await getSettings();
 
-  // 2. Browser starten
-  import puppeteer from 'puppeteer';
-
-  // ... in deiner Funktion ...
+  // 2. Browser starten (WICHTIG: executablePath für Docker!)
   const browser = await puppeteer.launch({
     headless: true,
     args: [
-      "--no-sandbox",
+      "--no-sandbox", 
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
-      "--disable-gpu",
+      "--disable-gpu"
     ],
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, // WICHTIG!
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, 
   });
-  // 3. HTML generieren (Jetzt mit Variablen aus 'settings'!)
+
+  const page = await browser.newPage();
+
+  // 3. HTML generieren
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -30,7 +30,6 @@ export async function generateHtmlPdf(order: any) {
         .company-info { text-align: right; font-size: 0.9em; color: #666; }
         .company-name { font-size: 1.5em; font-weight: bold; color: #000; margin-bottom: 5px; }
         .title { font-size: 2em; font-weight: bold; margin-bottom: 10px; }
-        .meta { margin-bottom: 30px; }
         .meta-item { margin-bottom: 5px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th { text-align: left; background: #f4f4f4; padding: 10px; border-bottom: 2px solid #ddd; }
