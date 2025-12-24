@@ -9,11 +9,13 @@ import {
   SquareTerminal,
   Users,
   LogOut,
-  Package,        // Icon für Products
-  Layers,         // Icon für Production
-  ClipboardList,  // Icon für Orders
-  Box,            // Icon für Inventory
-  Bot             // Icon für Automation
+  Package,
+  Layers,
+  ClipboardList,
+  Box,
+  Bot,
+  PenTool,      // Icon für Tools/Konfigurator
+  Wrench        // Alternatives Icon
 } from "lucide-react"
 
 import {
@@ -36,7 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
-// ✅ NEUE STRUKTUR: Operations, Resources, System
+// ✅ NEUE STRUKTUR MIT 'TOOLS'
 const data = {
   user: {
     name: "Miktool User",
@@ -79,7 +81,7 @@ const data = {
       icon: Package,
       items: [
         {
-          title: "Products", // 🌟 Die neue Seite!
+          title: "Products",
           url: "/products",
           icon: Package,
         },
@@ -92,6 +94,18 @@ const data = {
           title: "Clients",
           url: "/clients",
           icon: Users,
+        },
+      ],
+    },
+    {
+      title: "Tools", // 🌟 NEUE GRUPPE
+      url: "#",
+      icon: Wrench,
+      items: [
+        {
+          title: "Live Configurator",
+          url: "/tools/configurator",
+          icon: PenTool,
         },
       ],
     },
@@ -149,7 +163,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       
       <SidebarContent>
-        {/* ✅ Hier rendern wir jetzt Gruppen (Operations, Resources, System) */}
         {data.navMain.map((group) => (
           <SidebarGroup key={group.title}>
             <SidebarGroupLabel>{group.title}</SidebarGroupLabel>

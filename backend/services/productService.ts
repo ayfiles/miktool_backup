@@ -35,12 +35,13 @@ export async function getAllProducts() {
 }
 
 /* ===============================
-   GET PRODUCT BY ID
+   GET PRODUCT BY ID (Updated)
 ================================ */
 export async function getProductById(id: string) {
+  // ✅ UPDATE: Wir laden jetzt auch 'product_assets' mit!
   const { data, error } = await supabase
     .from("products")
-    .select("*, inventory(*)")
+    .select("*, inventory(*), product_assets(*)") 
     .eq("id", id)
     .single();
 
