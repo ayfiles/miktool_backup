@@ -1,107 +1,87 @@
 import { Router } from "express";
-import { supabase } from "../supabaseClient";
-import { getClients, createClient, deleteClient, updateClient } from "../services/clientService"; // <--- updateClient importieren
+import { 
+  getAllClients, // ✅ Hieß früher getClients
+  createClient, 
+  getClientById, 
+  updateClient,
+  deleteClient 
+} from "../services/clientService";
 
 const router = Router();
 
-/* -----------------------------
-   GET all clients
------------------------------ */
-router.get("/", async (_req, res) => {
+// ==========================================
+// GET /clients - Alle holen
+// ==========================================
+router.get("/", async (req, res) => {
   try {
-    const clients = await getClients();
+    const clients = await getAllClients();
     res.json(clients);
   } catch (error) {
-    console.error("Failed to load clients:", error);
-    res.status(500).json({ error: "Failed to load clients" });
+    console.error("Error fetching clients:", error);
+    res.status(500).json({ error: "Failed to fetch clients" });
   }
 });
 
-/* -----------------------------
-   CREATE client
------------------------------ */
-router.post("/", async (req, res) => {
-  const { name } = req.body;
-
-  if (!name || typeof name !== "string") {
-    return res.status(400).json({ error: "Client name required" });
-  }
-
+// ==========================================
+// GET /clients/:id - Details für einen Client
+// ==========================================
+router.get("/:id", async (req, res) => {
   try {
-    const client = await createClient(name);
-    res.status(201).json(client);
+    const client = await getClientById(req.params.id);
+    
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+    
+    res.json(client);
   } catch (error) {
-    console.error("Failed to create client:", error);
+    console.error("Error fetching client:", error);
+    res.status(500).json({ error: "Failed to fetch client details" });
+  }
+});
+
+// ==========================================
+// POST /clients - Neuen Client erstellen
+// ==========================================
+router.post("/", async (req, res) => {
+  try {
+    // Wir übergeben jetzt den ganzen Body (Name, Adresse, etc.), nicht nur den Namen
+    const newClient = await createClient(req.body);
+    res.status(201).json(newClient);
+  } catch (error) {
+    console.error("Error creating client:", error);
     res.status(500).json({ error: "Failed to create client" });
   }
 });
 
-/* -----------------------------
-   GET orders by client (WITH STATUS + ITEM COUNT)
------------------------------ */
-router.get("/:clientId/orders", async (req, res) => {
-  const { clientId } = req.params;
-
-  const { data, error } = await supabase
-    .from("orders")
-    .select(`
-      id,
-      created_at,
-      status,
-      order_items ( id )
-    `)
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Failed to fetch orders:", error);
-    return res.status(500).json({ error: error.message });
-  }
-
-  res.json(
-    (data ?? []).map((order) => ({
-      id: order.id,
-      created_at: order.created_at,
-      status: order.status,
-      items_count: order.order_items?.length ?? 0,
-    }))
-  );
-});
-
-
-/* -----------------------------
-   UPDATE client
------------------------------ */
-router.put("/:id", async (req, res) => {
-  const { id } = req.params;
-  const { name } = req.body;
-
-  if (!name || typeof name !== "string") {
-    return res.status(400).json({ error: "Client name required" });
-  }
-
+// ==========================================
+// PATCH /clients/:id - Client bearbeiten
+// ==========================================
+router.patch("/:id", async (req, res) => {
   try {
-    const updated = await updateClient(id, name);
-    res.json(updated);
-  } catch (error: any) {
-    console.error("Failed to update client:", error);
-    res.status(500).json({ error: error.message || "Failed to update client" });
+    // Auch hier: Wir übergeben das Update-Objekt direkt
+    const updatedClient = await updateClient(req.params.id, req.body);
+    res.json(updatedClient);
+  } catch (error) {
+    console.error("Error updating client:", error);
+    res.status(500).json({ error: "Failed to update client" });
   }
 });
-/* -----------------------------
-   DELETE client (SAFE)
------------------------------ */
+
+// ==========================================
+// DELETE /clients/:id - Client löschen
+// ==========================================
 router.delete("/:id", async (req, res) => {
-  const { id } = req.params;
-
   try {
-    await deleteClient(id);
-    res.status(204).send();
+    await deleteClient(req.params.id);
+    res.json({ message: "Client deleted successfully" });
   } catch (error: any) {
-    console.error("Failed to delete client:", error);
-    res.status(500).json({
-      error: error?.message ?? "Failed to delete client",
-    });
+    // Falls der Fehler "Client has existing orders" ist (siehe Service)
+    if (error.message && error.message.includes("existing orders")) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error("Error deleting client:", error);
+    res.status(500).json({ error: "Failed to delete client" });
   }
 });
 
