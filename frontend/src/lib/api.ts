@@ -104,7 +104,7 @@ export async function createProduct(payload: Omit<Product, "id">): Promise<Produ
   });
 }
 
-// ✅ NEU: BATCH IMPORT (CSV)
+// ✅ BATCH IMPORT (CSV)
 export async function createBulkProducts(products: any[]): Promise<any[]> {
   return fetchWithAuth("/products/batch", {
     method: "POST",
@@ -157,6 +157,7 @@ export async function updateOrderStatus(orderId: string, status: string) {
 }
 
 export async function downloadOrderPdf(orderId: string) {
+    // PDF braucht eigenen Header-Auth Flow, da response ein Blob ist
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -194,9 +195,18 @@ export async function updateInventoryQuantity(id: string, q: number) {
   }); 
 }
 
+// ✅ Hier richtig einsortiert (war vorher doppelt am Ende)
+export async function updateInventoryItem(id: string, payload: any) {
+  return fetchWithAuth(`/inventory/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function deleteInventoryItem(id: string) { 
   return fetchWithAuth(`/inventory/${id}`, { method: "DELETE" }); 
 }
+
 export async function syncInventory() {
   return fetchWithAuth("/inventory/sync", { method: "POST" });
 }
@@ -218,14 +228,4 @@ export async function updateSettings(p: any) {
     method: "PUT", 
     body: JSON.stringify(p) 
   }); 
-}
-
-// In frontend/src/lib/api.ts
-
-export async function updateInventoryItem(id: string, payload: any) {
-  // Wir nutzen fetchWithAuth, damit der Token automatisch mitgesendet wird
-  return fetchWithAuth(`/inventory/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
 }
