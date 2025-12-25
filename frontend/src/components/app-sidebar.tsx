@@ -12,7 +12,6 @@ import {
   Package,
   Layers,
   ClipboardList,
-  Box,
   Bot,
   PenTool,      // Icon für Tools/Konfigurator
   Wrench        // Alternatives Icon
@@ -38,7 +37,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
-// ✅ NEUE STRUKTUR MIT 'TOOLS'
+// ✅ NEUE STRUKTUR (OHNE INVENTORY)
 const data = {
   user: {
     name: "Miktool User",
@@ -85,11 +84,7 @@ const data = {
           url: "/products",
           icon: Package,
         },
-        {
-          title: "Inventory", 
-          url: "/inventory",
-          icon: Box,
-        },
+        // 👇 INVENTORY WURDE HIER ENTFERNT
         {
           title: "Clients",
           url: "/clients",
@@ -98,7 +93,7 @@ const data = {
       ],
     },
     {
-      title: "Tools", // 🌟 NEUE GRUPPE
+      title: "Tools",
       url: "#",
       icon: Wrench,
       items: [

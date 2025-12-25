@@ -1,190 +1,141 @@
 "use client";
 
+import ProductImportDialog from "@/components/products/ProductImportDialog"; // ✅ Import war schon da
 import { useState, useEffect } from "react";
-import { getProducts, deleteProduct } from "@/lib/api";
+import { getProducts } from "@/lib/api"; 
 import { Product } from "@/types/product";
-import { 
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import { Plus, Search, Box, Edit2 } from "lucide-react"; 
 import { Input } from "@/components/ui/input";
-import { 
-  Search, Package, Trash2, Box, AlertTriangle, Layers
-} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import CreateProductDialog from "@/components/products/CreateProductDialog"; 
-import CsvImportDialog from "@/components/products/CsvImportDialog";
+import CreateProductDialog from "@/components/products/CreateProductDialog";
+import ProductStockDialog from "@/components/products/ProductStockDialog";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  
+  // State für Stock Dialog
+  const [selectedProductForStock, setSelectedProductForStock] = useState<Product | null>(null);
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
-  async function loadProducts() {
+  async function loadData() {
+    setLoading(true);
     try {
       const data = await getProducts();
       setProducts(data);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load products");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: string) {
-    if(!confirm("Delete this product? All linked inventory items will also be removed.")) return;
-    try {
-      await deleteProduct(id);
-      setProducts(p => p.filter(x => x.id !== id));
-      toast.success("Product deleted");
-    } catch(err) {
-      toast.error("Failed to delete product");
-    }
-  }
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  // Erweiterte Suche: Name, Kategorie oder Stoff
   const filtered = products.filter(p => 
-    p.name.toLowerCase().includes(query.toLowerCase()) ||
-    p.category?.toLowerCase().includes(query.toLowerCase()) ||
-    p.fabric?.toLowerCase().includes(query.toLowerCase())
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.category.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="w-full px-6 md:px-10 py-8 space-y-8 pb-20">
+    <div className="container mx-auto py-8 space-y-6">
       
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Box className="h-8 w-8 text-primary" /> Products
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Manage your textile catalog and track live stock levels.
-          </p>
+           <h1 className="text-3xl font-bold tracking-tight">Products & Inventory</h1>
+           <p className="text-muted-foreground">Manage your catalog and stock levels in one place.</p>
         </div>
         
-        <div className="flex items-center gap-2">
-            <CsvImportDialog onSuccess={loadProducts} />
-            <CreateProductDialog onProductCreated={loadProducts} />
+        {/* 👇 HIER WURDE GEÄNDERT: Beide Buttons nebeneinander */}
+        <div className="flex gap-2">
+            <ProductImportDialog onSuccess={loadData} />
+            <CreateProductDialog onProductCreated={loadData} />
         </div>
       </div>
 
-      <div className="space-y-4">
-        {/* SEARCH & STATS */}
-        <div className="flex flex-col md:flex-row justify-between gap-4">
-          <div className="relative max-w-md w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, fabric or category..."
-              className="pl-10 bg-card"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+      {/* Filter */}
+      <div className="flex items-center gap-2">
+         <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+                placeholder="Search products..." 
+                className="pl-9" 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
             />
-          </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-             <span>Total: <strong>{products.length}</strong> Products</span>
-             <span>Low Stock: <strong className="text-orange-600">{products.filter(p => p.isLowStock).length}</strong></span>
-          </div>
-        </div>
-
-        {/* TABLE */}
-        <div className="rounded-md border bg-card overflow-hidden">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead className="w-[300px]">Product & Details</TableHead>
-                <TableHead>Specifications</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Stock Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                 <TableRow><TableCell colSpan={5} className="h-24 text-center">Loading catalog...</TableCell></TableRow>
-              ) : filtered.length === 0 ? (
-                 <TableRow><TableCell colSpan={5} className="h-24 text-center text-muted-foreground">No products found.</TableCell></TableRow>
-              ) : (
-                filtered.map((product) => (
-                  <TableRow key={product.id} className="hover:bg-muted/30 transition-colors">
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-base">{product.name}</span>
-                        <span className="text-xs text-primary font-medium">{product.category}</span>
-                        {product.branch && (
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">
-                            Sector: {product.branch}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        {product.fabric && (
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <Layers size={12} className="text-muted-foreground" />
-                            <span>{product.fabric} {product.gsm ? `(${product.gsm})` : ""}</span>
-                          </div>
-                        )}
-                        {product.fit && (
-                          <Badge variant="secondary" className="w-fit text-[10px] h-4 px-1">
-                            {product.fit} Fit
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="font-mono">
-                      {Number(product.base_price).toFixed(2)} €
-                    </TableCell>
-                    
-                    <TableCell>
-                      {(() => {
-                        const { stock, isLowStock, inventoryCount } = product;
-
-                        if (inventoryCount === 0) {
-                          return <Badge variant="outline" className="text-muted-foreground border-dashed">Not Tracked</Badge>;
-                        }
-
-                        if (stock <= 0) {
-                          return <Badge variant="destructive" className="bg-red-600">Out of Stock</Badge>;
-                        }
-
-                        if (isLowStock) {
-                          return (
-                            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 gap-1 animate-pulse">
-                              <AlertTriangle size={12} /> Low Stock: {stock}
-                            </Badge>
-                          );
-                        }
-
-                        return (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                             {stock} Units
-                          </Badge>
-                        );
-                      })()}
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                       <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)} className="hover:text-red-600">
-                         <Trash2 className="h-4 w-4"/>
-                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+         </div>
       </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+         {filtered.map(product => (
+            <Card key={product.id} className="flex flex-col overflow-hidden group hover:border-blue-500/50 transition-all">
+                
+                {/* Image Placeholder */}
+                <div className="h-40 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center relative">
+                    {/* Stock Badge */}
+                    <div className="absolute top-2 right-2">
+                        {product.isLowStock ? (
+                             <Badge variant="destructive" className="animate-pulse">Low Stock</Badge>
+                        ) : (
+                             <Badge variant="secondary" className="bg-white/90 dark:bg-black/90 text-xs">
+                                {product.stock} in Stock
+                             </Badge>
+                        )}
+                    </div>
+                    {/* Placeholder Icon */}
+                    <div className="text-4xl text-zinc-300 font-bold select-none">
+                        {product.name.substring(0,2).toUpperCase()}
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-4 flex-1 flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="font-semibold truncate pr-2" title={product.name}>{product.name}</div>
+                            <div className="text-xs text-muted-foreground">{product.category}</div>
+                        </div>
+                        <div className="font-mono text-sm">
+                            {product.base_price.toFixed(2)} €
+                        </div>
+                    </div>
+
+                    <div className="mt-auto pt-4 flex gap-2">
+                        {/* Stock Button */}
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex-1"
+                            onClick={() => setSelectedProductForStock(product)}
+                        >
+                            <Box className="mr-2 h-3 w-3" /> Stock
+                        </Button>
+                        
+                        <Button variant="ghost" size="sm" className="px-2">
+                            <Edit2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                    </div>
+                </div>
+            </Card>
+         ))}
+      </div>
+
+      {/* Das Modal wird hier eingebunden */}
+      {selectedProductForStock && (
+          <ProductStockDialog 
+            open={!!selectedProductForStock} 
+            product={selectedProductForStock}
+            onClose={() => setSelectedProductForStock(null)}
+            onUpdate={loadData}
+          />
+      )}
+
     </div>
   );
 }

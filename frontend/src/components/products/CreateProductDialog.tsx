@@ -6,7 +6,6 @@ import { Plus, Loader2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +31,6 @@ export default function CreateProductDialog({ onProductCreated }: Props) {
     setIsMounted(true);
   }, []);
 
-  // Erweitertes Form State für die SevenHills Attribute
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -40,7 +38,6 @@ export default function CreateProductDialog({ onProductCreated }: Props) {
     colors: "",
     sizes: "",
     base_price: "",
-    // ✅ NEUE FELDER
     branch: "",
     gender: "",
     fit: "",
@@ -69,7 +66,6 @@ export default function CreateProductDialog({ onProductCreated }: Props) {
         available_colors: cleanArray(formData.colors),
         available_sizes: cleanArray(formData.sizes),
         base_price: parseFloat(formData.base_price) || 0,
-        // ✅ NEUE FELDER im Payload
         branch: formData.branch,
         gender: formData.gender,
         fit: formData.fit,
@@ -85,7 +81,6 @@ export default function CreateProductDialog({ onProductCreated }: Props) {
       if (onProductCreated) onProductCreated(newProduct);
       setOpen(false);
       
-      // Reset
       setFormData({
         name: "", category: "", description: "", colors: "", sizes: "", base_price: "",
         branch: "", gender: "", fit: "", fabric: "", gsm: "",
@@ -109,6 +104,7 @@ export default function CreateProductDialog({ onProductCreated }: Props) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
+          {/* 👇 HIER WAR DER FEHLER: Das "/" fehlte */}
           <DialogHeader>
             <DialogTitle>Neues Produkt anlegen</DialogTitle>
             <DialogDescription>Manuelle Erfassung der SevenHills Produktdaten.</DialogDescription>
@@ -159,14 +155,30 @@ export default function CreateProductDialog({ onProductCreated }: Props) {
                         <Input id="gsm" value={formData.gsm} onChange={(e) => handleChange("gsm", e.target.value)} placeholder="z.B. 180 GSM" />
                     </div>
                 </div>
+                
+                <div className="grid gap-2">
+                    <Label htmlFor="fit">Passform (Fit)</Label>
+                    <Input id="fit" value={formData.fit} onChange={(e) => handleChange("fit", e.target.value)} placeholder="Regular / Oversize" />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="fit">Passform (Fit)</Label>
-                        <Input id="fit" value={formData.fit} onChange={(e) => handleChange("fit", e.target.value)} placeholder="Regular / Oversize" />
+                        <Label htmlFor="colors">Verfügbare Farben</Label>
+                        <Input 
+                            id="colors" 
+                            value={formData.colors} 
+                            onChange={(e) => handleChange("colors", e.target.value)} 
+                            placeholder="Red, Blue, Black (Komma getrennt)" 
+                        />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="sizes">Verfügbare Größen</Label>
-                        <Input id="sizes" value={formData.sizes} onChange={(e) => handleChange("sizes", e.target.value)} placeholder="S, M, L (Komma getrennt)" />
+                        <Input 
+                            id="sizes" 
+                            value={formData.sizes} 
+                            onChange={(e) => handleChange("sizes", e.target.value)} 
+                            placeholder="S, M, L (Komma getrennt)" 
+                        />
                     </div>
                 </div>
             </div>

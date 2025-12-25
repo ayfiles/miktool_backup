@@ -1,9 +1,11 @@
+// frontend/src/types/product.ts
+
 export interface ProductAsset {
   id: string;
   product_id: string;
   view: 'front' | 'back' | string;
   base_image: string;
-  color?: string;      // NEU: Farbvariante (z.B. "Navy")
+  color?: string;      // ✅ NEU: Farbvariante (z.B. "Navy")
   print_mask?: string; // Optional: Bereich für den Druck
 }
 
@@ -16,7 +18,7 @@ export interface Product {
   available_colors: string[];
   available_sizes: string[];
   
-  // NEUE FELDER aus der SevenHills CSV
+  // ✅ NEUE FELDER aus der SevenHills CSV
   branch?: string;
   gender?: string;
   fit?: string;
@@ -33,4 +35,16 @@ export interface Product {
 
   // Relation: Verknüpfte Assets (Bilder für den Konfigurator)
   product_assets?: ProductAsset[]; 
+
+  // 👇 WICHTIG: Das Inventory-Feld muss hier definiert sein,
+  // damit OrderForm.tsx auf product.inventory zugreifen darf!
+  inventory?: {
+    id: string;
+    product_id: string;
+    size: string;
+    color: string;
+    quantity: number;
+    min_quantity?: number;
+    sku?: string;
+  }[];
 }
