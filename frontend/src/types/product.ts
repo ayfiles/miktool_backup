@@ -17,6 +17,10 @@ export interface Product {
   base_price: number;
   available_colors: string[];
   available_sizes: string[];
+
+  // Base mockup images (used for digital tint preview)
+  image_front_url?: string;
+  image_back_url?: string;
   
   // ✅ NEUE FELDER aus der SevenHills CSV
   branch?: string;
